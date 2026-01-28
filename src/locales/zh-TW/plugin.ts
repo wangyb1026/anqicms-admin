@@ -811,6 +811,7 @@ export default {
   'plugin.order.tracking-number': '快遞單號',
   'plugin.pay.setting': '支付設置',
   'plugin.pay.wechat': '微信支付',
+  'plugin.pay.weapp': '微信小程序支付',
   'plugin.pay.alipay': '支付寶支付',
   'plugin.pay.paypal': 'PayPal',
   'plugin.pay.paypal.client-id': 'Client ID',
@@ -931,7 +932,7 @@ export default {
   'plugin.rewrite.setting.diy': '自訂偽靜態規則',
   'plugin.rewrite.setting.diy.explain': '自訂偽靜態規則說明',
   'plugin.rewrite.setting.diy.tips':
-    '請複製下面的規則到輸入框裡修改,一共6行,分別是文檔詳情、文檔列表、模型首頁、頁面、標籤列表、標籤詳情。 ===和前面部分不可修改。',
+    '请复制下面的规则到输入框里修改,一共6行,分别是文档详情、文档列表、模型首页、页面、标签列表、标签详情。===和前面部分不可修改。<br>文档详情还支持更灵活的自定义模式，可以单独给某个内容模型设置不同的伪静态规则。设置方法：<code>{内容模型的URL别名}:archive==={规则}</code>，如产品模型的URL别名后台设置的是：<code>products</code>，如需单独设置产品模型详情的伪静态规则为<code>/{catname}/{filename}.html</code>，则规则为：<code>products:archive===/{catname}/{filename}.html</code>',
   'plugin.rewrite.variable.tips':
     '變數以花括號包裹 `{}` ,如 `{id}` 。可用的變數有: 資料ID `{id}` ；文件自訂連結名稱`{filename}` ；分類自訂連結名稱`{catname}` ， 多層分類自訂連結名稱`{multicatname}` , `{ multicatname}` 和`{catname}` 只能用一個；分類ID `{catid}` ；模型表名`{module}` ；年`{year}` ， 月`{month}` ， 日`{day} ` ， 時`{hour}` ， 分`{minute}` ， 秒`{second}` ，年月日時分秒只有文檔(archive)可用； 分頁頁碼`{page}` ,分頁需放在小括號內, 如: `(/{page})` 。',
   'plugin.rewrite.formula.direct1': '可直接使用的方案1',
@@ -999,6 +1000,7 @@ export default {
   'plugin.sendmail.status': '發送狀態',
   'plugin.sendmail.tips': '郵件提醒可以將網站的留言透過郵件寄到你的信箱。',
   'plugin.sendmail.test.send': '發送測試郵件',
+  'plugin.sendmail.logs': '郵件發送记录',
   'plugin.sitemap.tips1':
     '現在各大搜尋引擎的sitemap提交，都已支援txt格式的sitemap，並且txt的sitemap檔案大小相比於xml的sitemap檔案更小，因此建議使用txt格式的Sitemap。',
   'plugin.sitemap.tips2':
@@ -1084,6 +1086,7 @@ export default {
   'plugin.timefactor.end-time.placeholder': '如：18',
   'plugin.timefactor.end-time.description': '如果填0，則表示23點結束',
   'plugin.timefactor.module': '開啟的模型',
+  'plugin.timefactor.random': '随机发布',
   'plugin.timefactor.category': '不參與更新的分類',
   'plugin.timefactor.category.placeholder':
     '如果你想排除某些分類，你可以在這裡選擇',
@@ -1170,6 +1173,9 @@ export default {
   'plugin.user.avatar_url': '用戶头像',
   'plugin.user.introduce': '用戶介绍',
   'plugin.user.user-name': '使用者名稱',
+  'plugin.user.first-name': '名字',
+  'plugin.user.last-name': '姓氏',
+  'plugin.user.birthday': '生日',
   'plugin.user.real-name': '真實姓名',
   'plugin.user.phone': '手機號',
   'plugin.user.email': '郵件地址',
@@ -1361,7 +1367,10 @@ export default {
   'plugin.multilang.auto_translate.true': '是',
   'plugin.multilang.auto_translate.description':
     '自動翻譯是一個付費功能，請查閱官網查看具體價格',
-  'plugin.multilang.sites': '多語言網站清單',
+  'plugin.multilang.show_main_dir': '是否显示主站点目录',
+  'plugin.multilang.show_main_dir.description':
+    '比如主站语言是en，那么主站点目录就是en',
+  'plugin.multilang.sites': '多語言網站管理',
   'plugin.multilang.add': '新增網站',
   'plugin.multilang.edit': '編輯多語言網站',
   'plugin.multilang.select': '選擇網站',

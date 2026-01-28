@@ -139,7 +139,9 @@ export default {
   'setting.content.thumb-size.height': '像素高',
   'setting.content.default-thumb': '預設縮圖',
   'setting.content.default-thumb.description':
-    '如果文章沒有縮圖，繼續呼叫將會使用預設縮圖代替',
+    '如果文章没有缩略图，继续调用将会使用默认缩略图代替，默认缩略图支持单图、选定的随机图片，或指定图片分类随机图片',
+  'setting.content.default-thumb.thumbs': '随机图片',
+  'setting.content.default-thumb.category': '图片分类',
   'setting.content.make-thumb': '批量生成縮圖',
   'setting.system.thumb-size.tips':
     '如果你更改了縮圖尺寸，請先提交儲存，然後再點擊重新',
@@ -208,6 +210,10 @@ export default {
   'setting.nav.home': '首頁',
   'setting.nav.confirm-delete': '確定要刪除該導航嗎',
   'setting.nav.types': '導航類別管理',
+  'setting.nav.types.title': '导航类别',
+  'setting.nav.types.add': '添加导航类别',
+  'setting.nav.types.edit': '编辑: ',
+  'setting.nav.types.name.require': '请填写名称',
   'setting.nav.add': '新增導航',
   'setting.nav.list': '導航列表',
   'setting.nav.outlink': '外鏈',

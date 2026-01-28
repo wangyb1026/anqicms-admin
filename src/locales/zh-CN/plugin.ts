@@ -812,6 +812,7 @@ export default {
   'plugin.order.express-company.baishi': '百世汇通',
   'plugin.order.tracking-number': '快递单号',
   'plugin.pay.wechat': '微信支付',
+  'plugin.pay.weapp': '微信小程序支付',
   'plugin.pay.alipay': '支付宝支付',
   'plugin.pay.paypal': 'PayPal',
   'plugin.pay.paypal.client-id': 'Client ID',
@@ -933,7 +934,7 @@ export default {
   'plugin.rewrite.setting.diy': '自定义伪静态规则',
   'plugin.rewrite.setting.diy.explain': '自定义伪静态规则说明',
   'plugin.rewrite.setting.diy.tips':
-    '请复制下面的规则到输入框里修改,一共6行,分别是文档详情、文档列表、模型首页、页面、标签列表、标签详情。===和前面部分不可修改。',
+    '请复制下面的规则到输入框里修改,一共6行,分别是文档详情、文档列表、模型首页、页面、标签列表、标签详情。===和前面部分不可修改。<br>文档详情还支持更灵活的自定义模式，可以单独给某个内容模型设置不同的伪静态规则。设置方法：<code>{内容模型的URL别名}:archive==={规则}</code>，如产品模型的URL别名后台设置的是：<code>products</code>，如需单独设置产品模型详情的伪静态规则为<code>/{catname}/{filename}.html</code>，则规则为：<code>products:archive===/{catname}/{filename}.html</code>',
   'plugin.rewrite.variable.tips':
     '变量由花括号包裹 `{}` ,如 `{id}` 。可用的变量有:数据ID `{id}` ； 文档自定义链接名 `{filename}` ； 分类自定义链接名 `{catname}` ， 多级分类自定义链接名 `{multicatname}` , `{multicatname}` 和 `{catname}` 只能使用一个； 分类ID `{catid}` ； 模型表名 `{module}` ；年 `{year}` ， 月 `{month}` ， 日 `{day}` ， 时 `{hour}` ， 分 `{minute}` ， 秒 `{second}` ，年月日时分秒只有文档(archive)可用； 分页页码 `{page}` ,分页需放在小括号内, 如: `(/{page})` 。',
   'plugin.rewrite.formula.direct1': '可直接使用的方案1',
@@ -1001,6 +1002,7 @@ export default {
   'plugin.sendmail.status': '发送状态',
   'plugin.sendmail.tips': '邮件提醒可以将网站的留言通过邮件发送到你的邮箱里。',
   'plugin.sendmail.test.send': '发送测试邮件',
+  'plugin.sendmail.logs': '邮件发送记录',
   'plugin.sitemap.tips1':
     '现在各大搜索引擎的sitemap提交，都已支持txt格式的sitemap，并且txt的sitemap文件大小相比于xml的sitemap文件更小，因此建议使用txt格式的Sitemap。',
   'plugin.sitemap.tips2':
@@ -1086,6 +1088,7 @@ export default {
   'plugin.timefactor.end-time.placeholder': '如：18',
   'plugin.timefactor.end-time.description': '如果填0，则表示23点结束',
   'plugin.timefactor.module': '开启的模型',
+  'plugin.timefactor.random': '随机发布',
   'plugin.timefactor.category': '不参与更新的分类',
   'plugin.timefactor.category.placeholder':
     '如果你想排除某些分类，可以在这里选择',
@@ -1172,6 +1175,9 @@ export default {
   'plugin.user.avatar_url': '用户头像',
   'plugin.user.introduce': '用户介绍',
   'plugin.user.user-name': '用户名',
+  'plugin.user.first-name': '名字',
+  'plugin.user.last-name': '姓氏',
+  'plugin.user.birthday': '生日',
   'plugin.user.real-name': '真实姓名',
   'plugin.user.phone': '手机号',
   'plugin.user.email': '邮箱地址',
@@ -1191,6 +1197,11 @@ export default {
   'plugin.user.extra-fields': '额外字段',
   'plugin.user.extra-fields.default': '默认值：',
   'plugin.user.delete.confirm': '确定要删除该条数据吗？',
+  'plugin.user.all': '所有客户',
+  'plugin.user.subscribed': '订阅客户',
+  'plugin.user.ordered': '已购客户',
+  'plugin.user.repurchase': '复购客户',
+  'plugin.user.unsubscribed': '未订阅',
   'plugin.watermark.generate.confirm': '确定要给图片库里的图片都添加上水印吗？',
   'plugin.watermark.generate.content': '已添加过水印的图片不会被重复添加。',
   'plugin.watermark.open': '是否启用水印',
@@ -1362,7 +1373,10 @@ export default {
   'plugin.multilang.auto_translate.true': '是',
   'plugin.multilang.auto_translate.description':
     '自动翻译是一个付费功能，请查阅官网查看具体价格',
-  'plugin.multilang.sites': '多语言站点列表',
+  'plugin.multilang.show_main_dir': '是否显示主站点目录',
+  'plugin.multilang.show_main_dir.description':
+    '比如主站语言是en，那么主站点目录就是en',
+  'plugin.multilang.sites': '多语言站点管理',
   'plugin.multilang.add': '添加站点',
   'plugin.multilang.edit': '编辑多语言站点',
   'plugin.multilang.select': '选择站点',
@@ -1392,6 +1406,10 @@ export default {
   'plugin.multilang.html-cache.delete': '删除',
   'plugin.multilang.translate-cache.clear-all': '删除全部',
   'plugin.multilang.html-cache.crean-all-confirm': '确定要删除全部翻译缓存吗？',
+  'plugin.multilang.text-log.manage': '管理翻译文本',
+  'plugin.multilang.text-log.add': '添加翻译文本',
+  'plugin.multilang.text-log.edit': '编辑翻译文本',
+  'plugin.multilang.text-log.text-required': '请填写要翻译的文本',
   'plugin.multilang.sync.cancel': '取消',
   'plugin.multilang.sync.all': '全量同步',
   'plugin.multilang.sync.addon': '增量同步',

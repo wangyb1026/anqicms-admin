@@ -897,7 +897,8 @@ export default {
   'plugin.order.tracking-number': 'tracking number',
   'plugin.pay.setting': 'Payment Settings',
   'plugin.pay.wechat': 'WeChat Pay',
-  'plugin.pay.alipay': 'Pay with Ali-Pay',
+  'plugin.pay.weapp': 'WeChat Mini Program Pay',
+  'plugin.pay.alipay': 'Alipay',
   'plugin.pay.paypal': 'PayPal',
   'plugin.pay.paypal.client-id': 'Client ID',
   'plugin.pay.paypal.secret': 'Client Secret',
@@ -1026,7 +1027,7 @@ export default {
   'plugin.rewrite.setting.diy': 'Custom pseudo-static rules',
   'plugin.rewrite.setting.diy.explain': 'Custom pseudo-static rule description',
   'plugin.rewrite.setting.diy.tips':
-    'Please copy the following rules into the input box to modify. There are 6 lines in total, namely document details, document list, model home page, page, tag list, and tag details. === and the previous part cannot be modified.',
+    'Please copy the following rules into the input box to modify. There are 6 lines in total, namely document details, document list, model home page, page, tag list, and tag details. === and the previous part cannot be modified.<br>Document details also support a more flexible custom mode, allowing separate pseudo-static rules to be set for different content models. The setting method is: <code>{Content model URL alias}:archive==={rule}</code>, for example, if the URL alias for the product model is set to <code>products</code> in the backend, and you need to separately set the pseudo-static rule for the product model details to <code>/{catname}/{filename}.html</code>, then the rule would be: <code>products:archive===/{catname}/{filename}.html</code>',
   'plugin.rewrite.variable.tips':
     'Variables are wrapped in curly braces `{}`, such as `{id}`. Available variables are: data ID `{id}`; document custom link name `{filename}`; classification custom link name `{catname}`, multi-level classification custom link name `{multicatname}`, `{ Only one of multicatname}` and `{catname}` can be used; classification ID `{catid}`; model table name `{module}`; year `{year}`, month `{month}`, day `{day} `, hour `{hour}`, minute `{minute}`, second `{second}`, year, month, day, hour, minute and second are only available in the archive; paging page number `{page}`, paging needs to be placed in parentheses , such as: `(/{page})` .',
   'plugin.rewrite.formula.direct1': 'Ready-to-use solution 1',
@@ -1198,6 +1199,7 @@ export default {
   'plugin.timefactor.end-time.description':
     'If you fill in 0, it means it will end at 23:00',
   'plugin.timefactor.module': 'Open model',
+  'plugin.timefactor.random': 'Random',
   'plugin.timefactor.category': 'Categories that do not participate in updates',
   'plugin.timefactor.category.placeholder':
     'If you want to exclude certain categories, you can choose here',
@@ -1292,6 +1294,9 @@ export default {
   'plugin.user.avatar_url': 'User avatar',
   'plugin.user.introduce': 'User introduction',
   'plugin.user.user-name': 'username',
+  'plugin.user.first-name': 'First Name',
+  'plugin.user.last-name': 'Last Name',
+  'plugin.user.birthday': 'Birthday',
   'plugin.user.real-name': 'actual name',
   'plugin.user.phone': 'Phone number',
   'plugin.user.email': 'email address',
@@ -1504,7 +1509,11 @@ export default {
   'plugin.multilang.auto_translate.true': 'Yes',
   'plugin.multilang.auto_translate.description':
     'Automatic translation is a paid feature. Please check the official website for specific prices',
-  'plugin.multilang.sites': 'Multilingual site list',
+  'plugin.multilang.show_main_dir':
+    'Whether to display the main site directory',
+  'plugin.multilang.show_main_dir.description':
+    'If yes is selected, the main site directory will be displayed',
+  'plugin.multilang.sites': 'Multilingual Sites Management',
   'plugin.multilang.add': 'Add site',
   'plugin.multilang.edit': 'Edit multilingual site',
   'plugin.multilang.select': 'Select site',

@@ -155,7 +155,9 @@ export default {
   'setting.content.thumb-size.height': 'Pixel height',
   'setting.content.default-thumb': 'Default thumbnail',
   'setting.content.default-thumb.description':
-    'If the article does not have a thumbnail, continuing the call will use the default thumbnail instead.',
+    'If the article does not have a thumbnail, the default thumbnail will be used instead when calling. The default thumbnail supports single image, selected random images, or random images from specified image categories',
+  'setting.content.default-thumb.thumbs': 'Random Images',
+  'setting.content.default-thumb.category': 'Image Category',
   'setting.content.make-thumb': 'Generate thumbnails in batches',
   'setting.system.thumb-size.tips':
     'If you change the thumbnail size, please save it first and then click Reset',
@@ -219,7 +221,7 @@ export default {
   'setting.banner.banner': 'slideshow',
   'setting.banner.group': 'Slide grouping',
   'setting.banner.group.placeholder': 'Please fill in the group name',
-  'setting.banner.group.add': 'Add group',
+  'setting.banner.group.add': 'Add Group',
   'setting.banner.logo-name': 'Slideshow pictures',
   'setting.banner.link-name': 'link address',
   'setting.banner.alt-name': 'ALT',
@@ -228,6 +230,10 @@ export default {
   'setting.nav.confirm-delete':
     'Are you sure you want to delete this navigation?',
   'setting.nav.types': 'Navigation category management',
+  'setting.nav.types.title': 'Name',
+  'setting.nav.types.add': 'Add Category',
+  'setting.nav.types.edit': 'Edit: ',
+  'setting.nav.types.name.require': 'Please fill in the category name',
   'setting.nav.add': 'Add navigation',
   'setting.nav.list': 'navigation list',
   'setting.nav.outlink': 'external link',
