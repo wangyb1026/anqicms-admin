@@ -170,7 +170,7 @@ const SettingNavFrom: React.FC<any> = () => {
   };
 
   const handleSelectLogo = (row: any) => {
-    setNavLogo(row.logo);
+    setNavLogo(row.file_path);
     message.success(
       intl.formatMessage({ id: 'setting.system.upload-success' }),
     );
@@ -272,32 +272,12 @@ const SettingNavFrom: React.FC<any> = () => {
     <NewContainer onTabChange={(key) => onTabChange(key)}>
       <Card
         key={newKey}
-        title={
-          <div>
-            <Space>
-              {navTypes.map((item) => (
-                <Button
-                  key={item.id}
-                  type={typeId === item.id ? 'primary' : 'default'}
-                  onClick={() => {
-                    handleChangeNavType(item.id);
-                  }}
-                >
-                  {item.title}
-                </Button>
-              ))}
-              <NavTypes
-                onCancel={() => {
-                  getNavTypes();
-                }}
-              >
-                <Button>
-                  <FormattedMessage id="setting.nav.types" />
-                </Button>
-              </NavTypes>
-            </Space>
-          </div>
-        }
+        activeTabKey={typeId + ''}
+        onTabChange={(tabKey) => handleChangeNavType(Number(tabKey))}
+        tabList={navTypes.map((item) => ({
+          key: item.id + '',
+          label: item.title,
+        }))}
       >
         <ProTable<any>
           key={newKey}
@@ -309,6 +289,16 @@ const SettingNavFrom: React.FC<any> = () => {
             <Button key="add" onClick={handleShowAddNav}>
               <FormattedMessage id="setting.nav.add" />
             </Button>,
+            <NavTypes
+              key="type"
+              onCancel={() => {
+                getNavTypes();
+              }}
+            >
+              <Button>
+                <FormattedMessage id="setting.nav.types" />
+              </Button>
+            </NavTypes>,
           ]}
           columns={columns}
           expandable={{
@@ -339,38 +329,46 @@ const SettingNavFrom: React.FC<any> = () => {
               },
               optionItemRender(item: any) {
                 return (
-                  <div
-                    dangerouslySetInnerHTML={{
-                      __html: (item.spacer || '') + item.title,
-                    }}
-                  ></div>
+                  <div title={item.title}>
+                    {item.parents?.length > 0 ? (
+                      <span className="text-muted">
+                        {item.parents
+                          ?.map((parent: any) => parent.title)
+                          .join(' > ')}
+                        {' > '}
+                      </span>
+                    ) : (
+                      ''
+                    )}
+                    {item.title}
+                  </div>
                 );
               },
             }}
             request={async () => {
               let newNavs = [
                 {
-                  spacer: '',
+                  parents: [],
                   title: intl.formatMessage({ id: 'setting.nav.top' }),
                   id: 0,
                 },
               ];
               for (let item of navs || []) {
                 newNavs.push({
-                  spacer: '',
+                  parents: [],
                   title: item.title,
                   id: item.id,
                 });
                 for (let sub of item.nav_list || []) {
                   let subItem = {
-                    spacer: (item.spacer || '') + '└  ',
+                    parents: sub.parents || [],
                     title: sub.title,
                     id: sub.id,
                   };
                   newNavs.push(subItem);
                   for (let sub2 of sub.nav_list || []) {
                     newNavs.push({
-                      spacer: (sub.spacer || '') + '└  ',
+                      parents: sub2.parents || [],
                       title: sub2.title,
                       id: sub2.id,
                     });
@@ -466,32 +464,27 @@ const SettingNavFrom: React.FC<any> = () => {
             <ProFormSelect
               name="page_id"
               width="lg"
+              showSearch
               label={intl.formatMessage({ id: 'setting.nav.select-page' })}
               options={categories.map((cat: any) => ({
-                spacer: cat.spacer,
-                title: cat.title,
-                label:
-                  cat.title +
-                  (cat.status === 1
-                    ? ''
-                    : intl.formatMessage({ id: 'setting.nav.hide' })),
+                label: (
+                  <div title={cat.title}>
+                    {cat.parents?.length > 0 ? (
+                      <span className="text-muted">
+                        {cat.parents
+                          ?.map((parent: any) => parent.title)
+                          .join(' > ')}
+                        {' > '}
+                      </span>
+                    ) : (
+                      ''
+                    )}
+                    {cat.title}
+                  </div>
+                ),
                 value: cat.id,
                 disabled: cat.status !== 1,
               }))}
-              fieldProps={{
-                optionItemRender(item: any) {
-                  return (
-                    <div
-                      dangerouslySetInnerHTML={{
-                        __html: item.spacer + item.label,
-                      }}
-                    ></div>
-                  );
-                },
-                onChange: (_, a: any) => {
-                  setDefaultTitle(a.title);
-                },
-              }}
             />
           )}
           {nav_type === 3 && (

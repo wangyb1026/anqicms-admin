@@ -7,12 +7,11 @@ import ImageItem from '@/components/attachment/image';
 import CollapseItem from '@/components/collaspeItem';
 import WangEditor from '@/components/editor';
 import Keywords from '@/components/keywords';
-import MarkdownEditor from '@/components/markdown';
-import NewAiEditor from '@/components/newAiEditor';
 import SelectColor from '@/components/selectColor';
 import {
   anqiExtractDescription,
   anqiExtractKeywords,
+  deleteArchive,
   deleteArchiveImage,
   getArchiveInfo,
   getArchives,
@@ -26,6 +25,7 @@ import {
   pluginGetUsers,
   saveArchive,
 } from '@/services';
+import { getPlaces, getPlaceSetting } from '@/services/place';
 import { getTags } from '@/services/tag';
 import { getStore, removeStore, setStore } from '@/utils/store';
 import {
@@ -33,7 +33,9 @@ import {
   DeleteOutlined,
   DownOutlined,
   LeftOutlined,
+  MoreOutlined,
   PlusOutlined,
+  QuestionCircleOutlined,
   RightOutlined,
   UpOutlined,
 } from '@ant-design/icons';
@@ -53,20 +55,25 @@ import {
 } from '@ant-design/pro-components';
 import { FormattedMessage, history, injectIntl } from '@umijs/max';
 import {
+  Badge,
   Button,
   Card,
   Col,
-  Image,
+  Dropdown,
+  message,
   Modal,
+  Popover,
   Row,
   Space,
   Tag,
-  message,
 } from 'antd';
 import dayjs from 'dayjs';
 import React from 'react';
 import { IntlShape } from 'react-intl';
 import './index.less';
+const MarkdownEditor = React.lazy(() => import('@/components/markdown'));
+const NewAiEditor = React.lazy(() => import('@/components/newAiEditor'));
+const SimpleEditor = React.lazy(() => import('@/components/simpleEditor'));
 
 export type intlProps = {
   intl: IntlShape;
@@ -87,6 +94,7 @@ class ArchiveForm extends React.Component<intlProps> {
     timelineExtraVisible: false,
     timelineField: '',
     timelineItemIndex: -1,
+    dragImageIndex: null,
 
     archiveSearchVisible: false,
     keywordsVisible: false,
@@ -109,6 +117,9 @@ class ArchiveForm extends React.Component<intlProps> {
       },
     ],
     selectedUser: {},
+    categories: [],
+    placeSetting: {},
+    places: [],
 
     aiVisible: false,
     aiTitle: '',
@@ -181,7 +192,7 @@ class ArchiveForm extends React.Component<intlProps> {
                   extra: {},
                   content: '',
                   flag: [],
-                  category_ids: [categoryId],
+                  category_id: categoryId,
                 },
               });
             }
@@ -201,6 +212,29 @@ class ArchiveForm extends React.Component<intlProps> {
         }
       },
     );
+    // 获取分类
+    getCategories().then((res) => {
+      let categories = res.data || [];
+      this.setState({
+        categories,
+      });
+      if (categories.length === 0) {
+        Modal.error({
+          title: this.props.intl.formatMessage({
+            id: 'content.category.error',
+          }),
+          onOk: () => {
+            history.push('/archive/category');
+          },
+        });
+      }
+    });
+    // placeSetting
+    getPlaceSetting().then((res) => {
+      this.setState({
+        placeSetting: res.data || {},
+      });
+    });
   };
 
   componentDidMount = async () => {
@@ -273,6 +307,8 @@ class ArchiveForm extends React.Component<intlProps> {
       archive.created_time = 0;
       archive.updated_time = 0;
     }
+    // 价格转换为元
+    archive.price = archive.price > 0 ? archive.price / 100 : 0;
     if (typeof archive.extra === 'undefined' || archive.extra === null) {
       archive.extra = {};
     }
@@ -336,6 +372,12 @@ class ArchiveForm extends React.Component<intlProps> {
         }
       });
     }
+    // category_ids 问题
+    if (archive.category_id > 0) {
+      archive.category_ids = archive.category_ids.filter(
+        (catid: number) => catid !== archive.category_id,
+      );
+    }
     this.getSelectedArchives(arcIds);
     this.getArchiveCategory(archive.category_id);
     this.setState({
@@ -346,6 +388,40 @@ class ArchiveForm extends React.Component<intlProps> {
       extraTexts: extraTexts,
       extraTimelines: extraTimelines,
       relations: archive.relations || [],
+    });
+  };
+
+  handleRemove = async (id: number) => {
+    if (!id) {
+      return;
+    }
+    Modal.confirm({
+      title: this.props.intl.formatMessage({ id: 'content.delete.confirm' }),
+      onOk: async () => {
+        const hide = message.loading(
+          this.props.intl.formatMessage({ id: 'content.delete.deletting' }),
+          0,
+        );
+        try {
+          await deleteArchive({
+            id: id,
+          });
+          hide();
+          message.success(
+            this.props.intl.formatMessage({ id: 'content.delete.success' }),
+          );
+          // 跳回上一步
+          history.back();
+
+          return true;
+        } catch (error) {
+          hide();
+          message.error(
+            this.props.intl.formatMessage({ id: 'content.delete.failure' }),
+          );
+          return true;
+        }
+      },
     });
   };
 
@@ -432,13 +508,13 @@ class ArchiveForm extends React.Component<intlProps> {
     for (const row of rows) {
       let exists = false;
       for (const i in archive.images) {
-        if (archive.images[i] === row.logo) {
+        if (archive.images[i] === row.file_path) {
           exists = true;
           break;
         }
       }
       if (!exists) {
-        archive.images.push(row.logo);
+        archive.images.push(row.file_path);
       }
     }
     this.setState({
@@ -447,6 +523,58 @@ class ArchiveForm extends React.Component<intlProps> {
     message.success(
       this.props.intl.formatMessage({ id: 'setting.system.upload-success' }),
     );
+  };
+
+  handleDragStart = (index: number) => {
+    this.setState({ dragImageIndex: index });
+  };
+
+  handleDragOver = (e: any, index: number) => {
+    e.preventDefault();
+    const { dragImageIndex, archive } = this.state;
+    if (dragImageIndex === -1 || dragImageIndex === index) {
+      return;
+    }
+    const images = [...(archive.images || [])];
+    const [moved] = images.splice(dragImageIndex, 1);
+    images.splice(index, 0, moved);
+    this.setState({
+      dragImageIndex: index,
+      archive: { ...archive, images },
+    });
+  };
+
+  handleDragEnd = () => {
+    this.setState({ dragImageIndex: -1 });
+  };
+
+  handleDrop = (e: any) => {
+    e.preventDefault();
+    this.handleDragEnd();
+  };
+
+  handleMoveImages = (index: number, direction: string, e: any) => {
+    e.stopPropagation();
+    const { archive } = this.state;
+    const images = [...(archive.images || [])];
+    if (direction === 'up') {
+      if (index <= 0) {
+        return;
+      }
+      const temp = images[index];
+      images[index] = images[index - 1];
+      images[index - 1] = temp;
+    } else {
+      if (index >= images.length - 1) {
+        return;
+      }
+      const temp = images[index];
+      images[index] = images[index + 1];
+      images[index + 1] = temp;
+    }
+    this.setState({
+      archive: { ...archive, images },
+    });
   };
 
   handleCleanLogo = (index: number, e: any) => {
@@ -649,7 +777,7 @@ class ArchiveForm extends React.Component<intlProps> {
     const postData = Object.assign(archive, values);
     postData.relation_ids = relations.map((item: any) => item.id);
     delete postData.relations;
-    postData.price = Number(values.price);
+    postData.price = Number((values.price * 100).toFixed(0));
     postData.stock = Number(values.stock);
     // eslint-disable-next-line guard-for-in
     for (let field in extraContent) {
@@ -682,26 +810,25 @@ class ArchiveForm extends React.Component<intlProps> {
     }
     // 必须选择分类
     let categoryIds = [];
-    let categoryId = 0;
-    if (typeof values.category_ids === 'number') {
-      // 单分类
-      categoryId = Number(values.category_ids);
-    } else {
-      for (let i in values.category_ids) {
-        if (values.category_ids[i] > 0) {
-          categoryIds.push(values.category_ids[i]);
-        }
-      }
-      if (categoryIds.length > 0) {
-        categoryId = categoryIds[0];
-      }
-    }
+    let categoryId = values.category_id;
     if (categoryId === 0) {
       this.loading = false;
       message.error(
         this.props.intl.formatMessage({ id: 'content.category.required' }),
       );
       return;
+    }
+    // 优先
+    categoryIds.push(categoryId);
+    if (values.category_ids) {
+      for (let i in values.category_ids) {
+        if (
+          values.category_ids[i] > 0 &&
+          values.category_ids[i] !== categoryId
+        ) {
+          categoryIds.push(values.category_ids[i]);
+        }
+      }
     }
     postData.category_id = categoryId;
     postData.category_ids = categoryIds;
@@ -780,13 +907,13 @@ class ArchiveForm extends React.Component<intlProps> {
 
   handleUploadExtraField = (field: string, row: any) => {
     const extra: any = {};
-    extra[field] = { value: row.logo };
+    extra[field] = { value: row.file_path };
     this.formRef?.current?.setFieldsValue({ extra });
     const { archive } = this.state;
     if (!archive.extra[field]) {
       archive.extra[field] = {};
     }
-    archive.extra[field].value = row.logo;
+    archive.extra[field].value = row.file_path;
 
     this.setState({
       archive,
@@ -844,13 +971,13 @@ class ArchiveForm extends React.Component<intlProps> {
     for (const row of rows) {
       let exists = false;
       for (const i in archive.extra[field].value) {
-        if (archive.extra[field].value[i] === row.logo) {
+        if (archive.extra[field].value[i] === row.file_path) {
           exists = true;
           break;
         }
       }
       if (!exists) {
-        archive.extra[field].value.push(row.logo);
+        archive.extra[field].value.push(row.file_path);
       }
     }
     const extra: any = {};
@@ -1059,13 +1186,13 @@ class ArchiveForm extends React.Component<intlProps> {
     for (const row of rows) {
       let exists = false;
       for (const i in extraTimelines[field].images) {
-        if (extraTimelines[field].images[i] === row.logo) {
+        if (extraTimelines[field].images[i] === row.file_path) {
           exists = true;
           break;
         }
       }
       if (!exists) {
-        extraTimelines[field].images.push(row.logo);
+        extraTimelines[field].images.push(row.file_path);
       }
     }
     const extra: any = {};
@@ -1164,13 +1291,13 @@ class ArchiveForm extends React.Component<intlProps> {
     for (const row of rows) {
       let exists = false;
       for (const i in extraTimelines[field].items[idx].images) {
-        if (extraTimelines[field].items[idx].images[i] === row.logo) {
+        if (extraTimelines[field].items[idx].images[i] === row.file_path) {
           exists = true;
           break;
         }
       }
       if (!exists) {
-        extraTimelines[field].items[idx].images.push(row.logo);
+        extraTimelines[field].items[idx].images.push(row.file_path);
       }
     }
     const extra: any = {};
@@ -1447,14 +1574,80 @@ class ArchiveForm extends React.Component<intlProps> {
       relations,
       searchArchives,
       searchUsers,
+      categories,
+      placeSetting,
       newKey,
     } = this.state;
     return (
       <NewContainer
         title={
-          archive.id > 0
-            ? this.props.intl.formatMessage({ id: 'content.archive.edit' })
-            : this.props.intl.formatMessage({ id: 'content.archive.add' })
+          <div className="heading-title">
+            {archive.id > 0 ? (
+              <div>
+                {archive.title}{' '}
+                {archive.status === 1 ? (
+                  <Badge
+                    className="site-badge-count-109"
+                    count={this.props.intl.formatMessage({
+                      id: 'content.status.normal',
+                    })}
+                    style={{ backgroundColor: '#52c41a' }}
+                  />
+                ) : (
+                  <Badge
+                    className="site-badge-count-109"
+                    count={this.props.intl.formatMessage({
+                      id: 'content.status.draft',
+                    })}
+                    style={{ backgroundColor: '#999999' }}
+                  />
+                )}
+              </div>
+            ) : (
+              <FormattedMessage id="content.archive.add" />
+            )}
+          </div>
+        }
+        extra={
+          archive.id > 0 ? (
+            <Space size={8}>
+              <Button
+                onClick={() => {
+                  history.push('/archive/detail?copyid=' + archive.id);
+                }}
+              >
+                <FormattedMessage id="content.action.copy" />
+              </Button>
+              <Button
+                onClick={() => {
+                  window.open(archive.link);
+                }}
+              >
+                <FormattedMessage id="menu.preview" />
+              </Button>
+              <Dropdown
+                menu={{
+                  items: [
+                    {
+                      key: 'delete',
+                      label: this.props.intl.formatMessage({
+                        id: 'setting.system.delete',
+                      }),
+                      onClick: () => {
+                        this.handleRemove(archive.id);
+                      },
+                    },
+                  ],
+                }}
+                key="more"
+              >
+                <Button>
+                  <FormattedMessage id="content.action.more" />
+                  <MoreOutlined />
+                </Button>
+              </Dropdown>
+            </Space>
+          ) : null
         }
         onTabChange={(key) => this.onTabChange(key)}
       >
@@ -1470,12 +1663,9 @@ class ArchiveForm extends React.Component<intlProps> {
                 <Col sm={18} xs={24}>
                   <ProFormText
                     name="title"
-                    label={
-                      module.title_name ||
-                      this.props.intl.formatMessage({
-                        id: 'content.title.name',
-                      })
-                    }
+                    label={this.props.intl.formatMessage({
+                      id: 'content.title.name',
+                    })}
                   />
                   <ProFormCheckbox.Group
                     name="flag"
@@ -1589,9 +1779,30 @@ class ArchiveForm extends React.Component<intlProps> {
                           placeholder={this.props.intl.formatMessage({
                             id: 'content.seo-title.placeholder',
                           })}
-                          extra={this.props.intl.formatMessage({
-                            id: 'content.seo-title.description',
-                          })}
+                          extra={
+                            <div>
+                              {this.props.intl.formatMessage({
+                                id: 'content.seo-title.description',
+                              })}
+                              {', '}
+                              <FormattedMessage id="setting.index.title.tips" />
+                              <Popover
+                                content={
+                                  <div style={{ whiteSpace: 'pre-wrap' }}>
+                                    {this.props.intl.formatMessage({
+                                      id: 'setting.index.params.tips',
+                                    })}
+                                  </div>
+                                }
+                                title={this.props.intl.formatMessage({
+                                  id: 'setting.index.title.tips',
+                                })}
+                              >
+                                {' '}
+                                <QuestionCircleOutlined />
+                              </Popover>
+                            </div>
+                          }
                         />
                       </Col>
                       <Col sm={12} xs={24}>
@@ -1759,7 +1970,13 @@ class ArchiveForm extends React.Component<intlProps> {
                           (item: any, index: number) =>
                             item.type !== 'editor' && (
                               <Col
-                                sm={item.type === 'timeline' ? 24 : 12}
+                                sm={
+                                  item.type === 'timeline' ||
+                                  item.type === 'images' ||
+                                  item.type === 'texts'
+                                    ? 24
+                                    : 12
+                                }
                                 xs={24}
                                 key={index}
                               >
@@ -2185,38 +2402,47 @@ class ArchiveForm extends React.Component<intlProps> {
                                       showSearch
                                       name={['extra', item.field_name, 'value']}
                                       mode={'single'}
-                                      request={async () => {
-                                        const res = await getCategories({
-                                          type: 1,
-                                        });
-                                        const categories = (res.data || []).map(
-                                          (cat: any) => ({
-                                            spacer: cat.spacer,
-                                            label:
-                                              cat.title +
-                                              (cat.status === 1
-                                                ? ''
-                                                : this.props.intl.formatMessage(
-                                                    {
-                                                      id: 'setting.nav.hide',
-                                                    },
-                                                  )),
-                                            value: cat.id,
+                                      options={[
+                                        {
+                                          title: this.props.intl.formatMessage({
+                                            id: 'content.please-select',
                                           }),
-                                        );
-                                        return categories;
-                                      }}
-                                      fieldProps={{
-                                        optionItemRender(item: any) {
-                                          return (
-                                            <div
-                                              dangerouslySetInnerHTML={{
-                                                __html:
-                                                  item.spacer + item.label,
-                                              }}
-                                            ></div>
-                                          );
+                                          value: 0,
                                         },
+                                      ]
+                                        .concat(categories)
+                                        .map((cat: any) => ({
+                                          title: cat.title,
+                                          label: (
+                                            <div title={cat.title}>
+                                              {cat.parents?.length > 0 ? (
+                                                <span className="text-muted">
+                                                  {cat.parents
+                                                    ?.map(
+                                                      (parent: any) =>
+                                                        parent.title,
+                                                    )
+                                                    .join(' > ')}
+                                                  {' > '}
+                                                </span>
+                                              ) : (
+                                                ''
+                                              )}
+                                              {cat.title}
+                                            </div>
+                                          ),
+                                          value: cat.id,
+                                          disabled: cat.status !== 1,
+                                        }))}
+                                      fieldProps={{
+                                        showSearch: true,
+                                        filterOption: (
+                                          input: string,
+                                          option: any,
+                                        ) =>
+                                          (option?.title ?? option?.label)
+                                            .toLowerCase()
+                                            .includes(input.toLowerCase()),
                                       }}
                                     />
                                   </ProFormText>
@@ -2436,7 +2662,7 @@ class ArchiveForm extends React.Component<intlProps> {
                                     </div>
                                     <div className="timeline-groups">
                                       {extraTimelines?.[item.field_name]?.items
-                                        .length
+                                        ?.length
                                         ? extraTimelines[
                                             item.field_name
                                           ].items.map(
@@ -2812,6 +3038,16 @@ class ArchiveForm extends React.Component<intlProps> {
                                   content={extraContent[item.field_name] || ''}
                                   ref={null}
                                 />
+                              ) : contentSetting.editor === 'simple' ? (
+                                <SimpleEditor
+                                  className="mb-normal"
+                                  setContent={this.setExtraContent.bind(
+                                    this,
+                                    item.field_name,
+                                  )}
+                                  content={extraContent[item.field_name] || ''}
+                                  ref={null}
+                                />
                               ) : (
                                 <NewAiEditor
                                   className="mb-normal"
@@ -2832,6 +3068,13 @@ class ArchiveForm extends React.Component<intlProps> {
                   )}
                   {contentSetting.editor === 'markdown' ? (
                     <MarkdownEditor
+                      className="mb-normal"
+                      setContent={this.setContent}
+                      content={content}
+                      ref={this.editorRef}
+                    />
+                  ) : contentSetting.editor === 'simple' ? (
+                    <SimpleEditor
                       className="mb-normal"
                       setContent={this.setContent}
                       content={content}
@@ -2910,49 +3153,34 @@ class ArchiveForm extends React.Component<intlProps> {
                   >
                     <ProFormSelect
                       //label="所属分类"
-                      showSearch
-                      name="category_ids"
+                      name="category_id"
                       width="lg"
-                      mode={
-                        contentSetting.multi_category === 1
-                          ? 'multiple'
-                          : 'single'
-                      }
-                      request={async () => {
-                        const res = await getCategories({ type: 1 });
-                        const categories = (res.data || []).map((cat: any) => ({
-                          spacer: cat.spacer,
-                          label:
-                            cat.title +
-                            (cat.status === 1
-                              ? ''
-                              : this.props.intl.formatMessage({
-                                  id: 'setting.nav.hide',
-                                })),
-                          value: cat.id,
-                        }));
-                        if (categories.length === 0) {
-                          Modal.error({
-                            title: this.props.intl.formatMessage({
-                              id: 'content.category.error',
-                            }),
-                            onOk: () => {
-                              history.push('/archive/category');
-                            },
-                          });
-                        }
-                        return categories;
-                      }}
+                      options={categories.map((cat: any) => ({
+                        title: cat.title,
+                        label: (
+                          <div title={cat.title}>
+                            {cat.parents?.length > 0 ? (
+                              <span className="text-muted">
+                                {cat.parents
+                                  ?.map((parent: any) => parent.title)
+                                  .join(' > ')}
+                                {' > '}
+                              </span>
+                            ) : (
+                              ''
+                            )}
+                            {cat.title}
+                          </div>
+                        ),
+                        value: cat.id,
+                        disabled: cat.status !== 1,
+                      }))}
                       fieldProps={{
-                        optionItemRender(item) {
-                          return (
-                            <div
-                              dangerouslySetInnerHTML={{
-                                __html: item.spacer + item.label,
-                              }}
-                            ></div>
-                          );
-                        },
+                        showSearch: true,
+                        filterOption: (input: string, option: any) =>
+                          (option?.title ?? option?.label)
+                            .toLowerCase()
+                            .includes(input.toLowerCase()),
                         onChange: this.onChangeSelectCategory,
                       }}
                       extra={
@@ -2962,6 +3190,45 @@ class ArchiveForm extends React.Component<intlProps> {
                         </div>
                       }
                     />
+                    {contentSetting.multi_category === 1 && (
+                      <ProFormSelect
+                        name="category_ids"
+                        width="lg"
+                        mode="multiple"
+                        options={categories.map((cat: any) => ({
+                          title: cat.title,
+                          label: (
+                            <div title={cat.title}>
+                              {cat.parents?.length > 0 ? (
+                                <span className="text-muted">
+                                  {cat.parents
+                                    ?.map((parent: any) => parent.title)
+                                    .join(' > ')}
+                                  {' > '}
+                                </span>
+                              ) : (
+                                ''
+                              )}
+                              {cat.title}
+                            </div>
+                          ),
+                          value: cat.id,
+                          disabled: cat.status !== 1,
+                        }))}
+                        fieldProps={{
+                          showSearch: true,
+                          filterOption: (input: string, option: any) =>
+                            (option?.title ?? option?.label)
+                              .toLowerCase()
+                              .includes(input.toLowerCase()),
+                        }}
+                        extra={
+                          <div>
+                            <FormattedMessage id="content.archive.related-category.description" />
+                          </div>
+                        }
+                      />
+                    )}
                   </Card>
                   <Card
                     className="aside-card"
@@ -2973,14 +3240,50 @@ class ArchiveForm extends React.Component<intlProps> {
                     <ProFormText>
                       {archive.images?.length
                         ? archive.images.map((item: string, index: number) => (
-                            <div className="ant-upload-item" key={index}>
+                            <div
+                              className={
+                                'ant-upload-item' +
+                                (this.state.dragImageIndex === index
+                                  ? ' drag-over'
+                                  : '')
+                              }
+                              key={index}
+                              draggable
+                              onDragStart={() => this.handleDragStart(index)}
+                              onDragOver={(e) => this.handleDragOver(e, index)}
+                              onDragEnd={this.handleDragEnd}
+                              onDrop={this.handleDrop}
+                            >
                               <ImageItem src={item} size={100} />
-                              <span
-                                className="delete"
-                                onClick={this.handleCleanLogo.bind(this, index)}
-                              >
-                                <DeleteOutlined />
-                              </span>
+                              <div className="ant-upload-item-action">
+                                <Tag
+                                  onClick={this.handleMoveImages.bind(
+                                    this,
+                                    index,
+                                    'up',
+                                  )}
+                                >
+                                  <LeftOutlined />
+                                </Tag>
+                                <Tag
+                                  color="red"
+                                  onClick={this.handleCleanLogo.bind(
+                                    this,
+                                    index,
+                                  )}
+                                >
+                                  <DeleteOutlined />
+                                </Tag>
+                                <Tag
+                                  onClick={this.handleMoveImages.bind(
+                                    this,
+                                    index,
+                                    'down',
+                                  )}
+                                >
+                                  <RightOutlined />
+                                </Tag>
+                              </div>
                             </div>
                           ))
                         : null}
@@ -3117,6 +3420,60 @@ class ArchiveForm extends React.Component<intlProps> {
                       }}
                     />
                   </Card>
+                  {placeSetting.open && (
+                    <Card
+                      className="aside-card"
+                      size="small"
+                      title={this.props.intl.formatMessage({
+                        id: 'content.place.title',
+                      })}
+                    >
+                      <ProFormSelect
+                        showSearch
+                        name="place_id"
+                        request={async () => {
+                          const res = await getPlaces();
+                          return [
+                            {
+                              title: this.props.intl.formatMessage({
+                                id: 'content.parent_id.empty',
+                              }),
+                              value: 0,
+                              status: 1,
+                            },
+                          ]
+                            .concat(res.data || [])
+                            .map((cat: any) => ({
+                              title: cat.title,
+                              label: (
+                                <div title={cat.title}>
+                                  {cat.parents?.length > 0 ? (
+                                    <span className="text-muted">
+                                      {cat.parents
+                                        ?.map((parent: any) => parent.title)
+                                        .join(' > ')}
+                                      {' > '}
+                                    </span>
+                                  ) : (
+                                    ''
+                                  )}
+                                  {cat.title}
+                                </div>
+                              ),
+                              value: cat.id,
+                              disabled: cat.status !== 1,
+                            }));
+                        }}
+                        fieldProps={{
+                          showSearch: true,
+                          filterOption: (input: string, option: any) =>
+                            (option?.title ?? option?.label)
+                              .toLowerCase()
+                              .includes(input.toLowerCase()),
+                        }}
+                      />
+                    </Card>
+                  )}
                   <Card
                     className="aside-card"
                     size="small"

@@ -173,7 +173,6 @@ const GlobalHeaderRight: React.FC = () => {
           <FormattedMessage id="component.right-content.restart" />
         </div>
       </Space>
-
       <Modal
         open={visible}
         onCancel={() => {

@@ -89,11 +89,11 @@ const TemplateShare: React.FC<TemplateShareProps> = (props) => {
               intl.formatMessage({ id: 'setting.system.upload-success' }),
           );
           if (field === 'pc_thumb') {
-            setPcThumb(res.data.logo);
+            setPcThumb(res.data.file_path || res.data.logo);
           } else if (field === 'mobile_thumb') {
-            setMobileThumb(res.data.logo);
+            setMobileThumb(res.data.file_path || res.data.logo);
           } else {
-            previewImages.push(res.data.logo);
+            previewImages.push(res.data.file_path || res.data.logo);
             setPreviewImages(([] as string[]).concat(...previewImages));
           }
         }
@@ -148,15 +148,21 @@ const TemplateShare: React.FC<TemplateShareProps> = (props) => {
           name="category_id"
           options={[
             {
-              label: '外贸模板',
+              label: intl.formatMessage({
+                id: 'design.share.category.foreign-trade',
+              }),
               value: 36,
             },
             {
-              label: '中文模板',
+              label: intl.formatMessage({
+                id: 'design.share.category.chinese',
+              }),
               value: 37,
             },
             {
-              label: '免费模板',
+              label: intl.formatMessage({
+                id: 'design.share.category.free',
+              }),
               value: 38,
             },
           ]}

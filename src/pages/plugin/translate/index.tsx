@@ -1,3 +1,4 @@
+import { useVipModal } from '@/components/vipModal';
 import {
   pluginGetTranslateConfig,
   pluginSaveTranslateConfig,
@@ -12,12 +13,13 @@ import {
   ProFormText,
   ProTable,
 } from '@ant-design/pro-components';
-import { FormattedMessage, useIntl } from '@umijs/max';
+import { FormattedMessage, history, useIntl } from '@umijs/max';
 import { Alert, Button, Card, Col, Modal, Row, message } from 'antd';
 import dayjs from 'dayjs';
 import React, { useEffect, useRef, useState } from 'react';
 
 const PluginTranslate: React.FC<any> = () => {
+  const { isVip, checkVip, VipModal } = useVipModal();
   const actionRef = useRef<ActionType>();
   const [setting, setSetting] = useState<any>({});
   const [fetched, setFetched] = useState<boolean>(false);
@@ -132,6 +134,12 @@ const PluginTranslate: React.FC<any> = () => {
                   },
                   {
                     label: intl.formatMessage({
+                      id: 'plugin.translate.engine.ai',
+                    }),
+                    value: 'ai',
+                  },
+                  {
+                    label: intl.formatMessage({
                       id: 'plugin.translate.engine.baidu',
                     }),
                     value: 'baidu',
@@ -149,7 +157,32 @@ const PluginTranslate: React.FC<any> = () => {
                     value: 'deepl',
                   },
                 ]}
+                disabled={isVip === false}
+                extra={
+                  !isVip ? (
+                    <div
+                      className="link"
+                      onClick={() => {
+                        checkVip(() => {});
+                      }}
+                    >
+                      <FormattedMessage id="plugin.translate.vip-tip" />
+                    </div>
+                  ) : null
+                }
               />
+              {engine === 'ai' && (
+                <div>
+                  <div
+                    className="link mb-normal"
+                    onClick={() => {
+                      history.push('/setting/ai');
+                    }}
+                  >
+                    <FormattedMessage id="plugin.translate.ai-config-tips" />
+                  </div>
+                </div>
+              )}
               {engine === 'baidu' && (
                 <Card
                   size="small"
@@ -246,7 +279,7 @@ const PluginTranslate: React.FC<any> = () => {
                   <div className="mt-normal">
                     <div className="font-bold">
                       {intl.formatMessage({
-                        id: 'plugin.translate.origin-content',
+                        id: 'content.translate.origin-content',
                       })}
                     </div>
                     <div className="mt-normal">{record.origin_content}</div>
@@ -268,6 +301,7 @@ const PluginTranslate: React.FC<any> = () => {
           }}
         />
       </Modal>
+      <VipModal />
     </PageContainer>
   );
 };

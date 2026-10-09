@@ -4,20 +4,24 @@ import {
   pluginBackupData,
   pluginBackupDelete,
   pluginBackupImport,
+  pluginBackupRemark,
   pluginBackupRestore,
   pluginGetBackupList,
   pluginGetBackupStatus,
 } from '@/services';
-import { calculateFileMd5, downloadFile, sizeFormat } from '@/utils';
+import config from '@/services/config';
+import { calculateFileMd5, sizeFormat } from '@/utils';
+import { getSessionStore, getStore } from '@/utils/store';
 import { ActionType, ProColumns, ProTable } from '@ant-design/pro-components';
 import { FormattedMessage, useIntl } from '@umijs/max';
 import {
   Button,
-  Card,
+  Input,
   Modal,
   Progress,
   Radio,
   Space,
+  Tag,
   Upload,
   message,
 } from 'antd';
@@ -27,7 +31,7 @@ import React, { useEffect, useRef, useState } from 'react';
 let running = false;
 let intXhr: any = null;
 
-const PluginUserGroup: React.FC = () => {
+const PluginBackup: React.FC = () => {
   const actionRef = useRef<ActionType>();
   const [task, setTask] = useState<any>(null);
   const [newKey, setNewKey] = useState<string>('');
@@ -143,19 +147,46 @@ const PluginUserGroup: React.FC = () => {
     });
   };
 
-  const handleDownloadBackup = (record: any) => {
+  const handleRemark = (record: any) => {
+    let remark = record.remark || '';
     Modal.confirm({
-      title: intl.formatMessage({ id: 'plugin.backup.download.confirm' }),
+      title: intl.formatMessage({ id: 'plugin.backup.remark.title' }),
+      content: (
+        <Input.TextArea
+          rows={3}
+          defaultValue={remark}
+          onChange={(e) => {
+            remark = e.target.value;
+          }}
+          placeholder={intl.formatMessage({
+            id: 'plugin.backup.remark.placeholder',
+          })}
+        />
+      ),
       onOk: () => {
-        downloadFile(
-          '/plugin/backup/export',
-          {
-            name: record.name,
-          },
-          record.name,
-        );
+        return pluginBackupRemark({
+          name: record.name,
+          remark: remark,
+        }).then((res) => {
+          message.info(res.msg);
+          actionRef.current?.reload();
+        });
       },
     });
+  };
+
+  const handleDownloadBackup = (record: any) => {
+    // 使用浏览器原生下载（window.open），避免大文件全量缓冲到内存。
+    // 认证 token 通过 query string 传递，后端 ParseAdminToken 已支持 fallback。
+    const token = getSessionStore('adminToken') || getStore('adminToken') || '';
+    const siteId = getSessionStore('site-id') || '';
+    const params = new URLSearchParams({
+      name: record.name,
+      token,
+      site_id: siteId,
+    });
+    const url = `${config.baseUrl}/plugin/backup/export?${params.toString()}`;
+    window.open(url, '_blank');
   };
 
   const handleUploadFile = async (e: any) => {
@@ -291,6 +322,29 @@ const PluginUserGroup: React.FC = () => {
       dataIndex: 'name',
     },
     {
+      title: intl.formatMessage({ id: 'plugin.backup.format' }),
+      dataIndex: 'name',
+      width: 80,
+      render: (_, record) => {
+        if (record.name.endsWith('.zip')) {
+          return <Tag color="blue">ZIP</Tag>;
+        }
+        return <Tag>SQL</Tag>;
+      },
+    },
+    {
+      title: intl.formatMessage({ id: 'plugin.backup.remark' }),
+      dataIndex: 'remark',
+      width: 180,
+      ellipsis: true,
+      render: (text) => {
+        if (!text) {
+          return <span style={{ color: '#999' }}>-</span>;
+        }
+        return text;
+      },
+    },
+    {
       title: intl.formatMessage({ id: 'plugin.backup.size' }),
       dataIndex: 'size',
       render: (item) => {
@@ -321,6 +375,13 @@ const PluginUserGroup: React.FC = () => {
           </a>
           <a
             onClick={() => {
+              handleRemark(record);
+            }}
+          >
+            <FormattedMessage id="plugin.backup.remark.edit" />
+          </a>
+          <a
+            onClick={() => {
               handleDelete(record);
             }}
           >
@@ -333,70 +394,72 @@ const PluginUserGroup: React.FC = () => {
 
   return (
     <NewContainer onTabChange={(key) => onTabChange(key)}>
-      <Card key={newKey}>
-        <ProTable<any>
-          headerTitle={intl.formatMessage({ id: 'menu.plugin.backup' })}
-          actionRef={actionRef}
-          rowKey="id"
-          toolBarRender={() => [
-            <Button type="primary" key="add" onClick={() => handleBackupData()}>
-              <FormattedMessage id="plugin.backup.new" />
-            </Button>,
-            <Upload
-              key="upload"
-              name="file"
-              className="logo-uploader"
-              showUploadList={false}
-              accept=".sql"
-              customRequest={handleUploadFile}
-            >
-              <Button type="primary">
-                <FormattedMessage id="plugin.backup.import" />
-              </Button>
-            </Upload>,
-            <Button key="clean" onClick={() => handleCleanup()}>
-              <FormattedMessage id="plugin.backup.cleanup" />
-            </Button>,
-          ]}
-          search={false}
-          tableAlertOptionRender={false}
-          request={(params) => {
-            return pluginGetBackupList(params);
-          }}
-          columnsState={{
-            persistenceKey: 'backup-table',
-            persistenceType: 'localStorage',
-          }}
-          columns={columns}
-          rowSelection={false}
-          pagination={{
-            showSizeChanger: true,
-          }}
-          summary={() => (
-            <div style={{ marginTop: 10 }}>
-              <FormattedMessage id="plugin.backup.tips" />
-            </div>
-          )}
-        />
-        {task !== null && (
-          <Modal
-            title={
-              task.type === 'backup'
-                ? intl.formatMessage({ id: 'plugin.backup.new' })
-                : intl.formatMessage({ id: 'plugin.backup.restore' })
-            }
-            open={true}
-            footer={null}
+      <ProTable<any>
+        key={newKey}
+        actionRef={actionRef}
+        rowKey="id"
+        toolBarRender={() => [
+          <Button type="primary" key="add" onClick={() => handleBackupData()}>
+            <FormattedMessage id="plugin.backup.new" />
+          </Button>,
+          <Upload
+            key="upload"
+            name="file"
+            className="logo-uploader"
+            showUploadList={false}
+            accept=".sql"
+            customRequest={handleUploadFile}
           >
-            <div className="task-progress">
-              <Progress percent={task.finished ? 100 : task.percent} />
-            </div>
-            <div className="task-message">{task.message}</div>
-          </Modal>
+            <Button type="primary">
+              <FormattedMessage id="plugin.backup.import" />
+            </Button>
+          </Upload>,
+          <Button key="clean" onClick={() => handleCleanup()}>
+            <FormattedMessage id="plugin.backup.cleanup" />
+          </Button>,
+        ]}
+        search={false}
+        tableAlertOptionRender={false}
+        request={(params) => {
+          return pluginGetBackupList(params);
+        }}
+        columnsState={{
+          persistenceKey: 'backup-table',
+          persistenceType: 'localStorage',
+        }}
+        columns={columns}
+        rowSelection={false}
+        pagination={{
+          showSizeChanger: true,
+        }}
+        summary={() => (
+          <tr>
+            <td colSpan={6}>
+              <div style={{ marginTop: 10 }}>
+                <FormattedMessage id="plugin.backup.tips" />
+              </div>
+            </td>
+          </tr>
         )}
-      </Card>
+      />
+      {task !== null && (
+        <Modal
+          title={
+            task.type === 'backup'
+              ? intl.formatMessage({ id: 'plugin.backup.new' })
+              : intl.formatMessage({ id: 'plugin.backup.restore' })
+          }
+          open={true}
+          footer={null}
+        >
+          <div className="task-progress">
+            <Progress percent={task.finished ? 100 : task.percent} />
+          </div>
+          <div className="task-message">{task.message}</div>
+        </Modal>
+      )}
     </NewContainer>
   );
 };
 
-export default PluginUserGroup;
+export default PluginBackup;

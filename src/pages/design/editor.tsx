@@ -25,6 +25,7 @@ import {
   Popover,
   Row,
   Space,
+  Tabs,
   Tree,
   message,
 } from 'antd';
@@ -36,6 +37,20 @@ import './index.less';
 
 let fileType: string = '';
 let helperEvent: any;
+
+interface TabItem {
+  key: string;
+  path: string;
+  type: string;
+  label: string;
+}
+
+interface TabData {
+  code: string;
+  loaded: boolean;
+  fileInfo: any;
+  unsave: boolean;
+}
 
 const DesignEditor: React.FC = () => {
   const [fileInfo, setFileInfo] = useState<any>({});
@@ -56,13 +71,101 @@ const DesignEditor: React.FC = () => {
   const [addCodeVisible, setAddCodeVisible] = useState<boolean>(false);
   const [addCode, setAddCode] = useState<any>({});
   const [codeValue, setCodeValue] = useState<string>('');
+  const [tabs, setTabs] = useState<TabItem[]>([]);
+  const [activeTab, setActiveTab] = useState<string>('');
+  const [renderTick, setRenderTick] = useState(0);
+  const tabDataRef = useRef<Record<string, TabData>>({});
+  // 每个 tab 独立的 monaco model，持有各自的滚动位置、undo 栈、语言
+  const modelsRef = useRef<Record<string, any>>({});
+  // 每个 tab 独立的 view state（光标、滚动等），在切走前保存
+  const viewStatesRef = useRef<Record<string, any>>({});
+  const editorRef = useRef<any>(null);
   const intl = useIntl();
 
-  let unsave = false;
+  const forceRender = () => setRenderTick((t) => t + 1);
 
-  const fetchDesignFileInfo = async (path: any) => {
+  const getLanguage = (filePath: string) => {
+    return filePath.indexOf('.html') !== -1
+      ? 'html'
+      : filePath.indexOf('.css') !== -1
+      ? 'css'
+      : filePath.indexOf('.yml') !== -1
+      ? 'yaml'
+      : 'javascript';
+  };
+
+  // 为指定 tab 创建（或复用）独立的 monaco model 并切到该 model
+  const switchToTabModel = (
+    key: string,
+    fileInfoData: any,
+    codeStr: string,
+  ) => {
+    const editor = editorRef.current;
+    if (!editor || !key) return;
+    const lang = getLanguage(fileInfoData?.path || '');
+    // 用唯一 URI 创建 model，避免不同 tab/语言复用同一 in-memory model
+    // 导致 css 颜色方块等装饰器残留到 html tab
+    let model = modelsRef.current[key];
+    if (!model) {
+      const uri = monaco.Uri.parse(
+        `inmemory://design/${encodeURIComponent(key)}`,
+      );
+      // 组件卸载时 model 可能仍留在 monaco 全局注册表中（如 HMR 后重挂载），
+      // 创建前优先复用同 URI 的已有 model，避免 ModelService 重复注册报错
+      model = monaco.editor.getModel(uri);
+      if (!model) {
+        model = monaco.editor.createModel(codeStr || '', lang, uri);
+      }
+      modelsRef.current[key] = model;
+    } else {
+      // model 已存在，只在内容真正变化时更新（避免覆盖用户编辑）
+      if (model.getValue() !== (codeStr || '')) {
+        model.setValue(codeStr || '');
+      }
+    }
+    // 切走前保存当前 tab 的 view state（滚动位置/光标）
+    const prevKey = activeTab;
+    if (prevKey && prevKey !== key && editor.getModel()) {
+      viewStatesRef.current[prevKey] = editor.saveViewState();
+    }
+    editor.setModel(model);
+    // 恢复目标 tab 的 view state（各自的滚动位置）
+    if (viewStatesRef.current[key]) {
+      editor.restoreViewState(viewStatesRef.current[key]);
+    }
+  };
+
+  const saveActiveTabData = () => {
+    if (activeTab && tabDataRef.current[activeTab]) {
+      tabDataRef.current[activeTab].code = code;
+      tabDataRef.current[activeTab].loaded = loaded;
+      tabDataRef.current[activeTab].fileInfo = { ...fileInfo };
+      tabDataRef.current[activeTab].unsave =
+        tabDataRef.current[activeTab].unsave || false;
+    }
+  };
+
+  const restoreActiveTabData = (key: string) => {
+    const data = tabDataRef.current[key];
+    if (data) {
+      setCode(data.code);
+      setFileInfo({ ...data.fileInfo });
+      setLoaded(data.loaded);
+    } else {
+      setCode('');
+      setFileInfo({});
+      setLoaded(false);
+    }
+  };
+
+  const fetchDesignFileInfo = async (path: any, tabKey?: string) => {
     const searchParams = new URLSearchParams(window.location.search);
     const packageName = searchParams.get('package') || '';
+    const key = tabKey || path;
+    // Mark tab as loading
+    if (tabDataRef.current[key]) {
+      tabDataRef.current[key].loaded = false;
+    }
     setLoaded(false);
     getDesignFileInfo({
       package: packageName,
@@ -73,6 +176,16 @@ const DesignEditor: React.FC = () => {
         setFileInfo(res.data);
         setCode(res.data.content || '');
         setLoaded(true);
+        // Store in tab data (always store when tabKey is provided)
+        tabDataRef.current[key] = {
+          code: res.data.content || '',
+          loaded: true,
+          fileInfo: { ...res.data },
+          unsave: false,
+        };
+        // 切换到该 tab 的独立 model（保留各自滚动位置、避免跨语言色块残留）
+        switchToTabModel(key, res.data, res.data.content || '');
+        forceRender();
         actionRef.current?.reload();
       })
       .catch(() => {
@@ -253,7 +366,13 @@ const DesignEditor: React.FC = () => {
         }
         setStaticFiles(statics);
 
-        fetchDesignFileInfo(path);
+        // Open initial file as first tab
+        const label = path.split('/').pop() || path;
+        const tabKey = path;
+        setTabs([{ key: tabKey, path, type, label }]);
+        setActiveTab(tabKey);
+        fileType = type;
+        fetchDesignFileInfo(path, tabKey);
       })
       .catch(() => {
         message.error(intl.formatMessage({ id: 'design.editor.get.error' }));
@@ -278,6 +397,16 @@ const DesignEditor: React.FC = () => {
     return () => {
       // 组件销毁时移除监听事件
       window.removeEventListener('resize', getHeight);
+      // 组件销毁时释放所有 tab 的 monaco model（留在全局注册表会导致
+      // 下次挂载 createModel 时报 ModelService: Cannot add model ...）
+      Object.keys(modelsRef.current).forEach((key) => {
+        try {
+          modelsRef.current[key]?.dispose();
+        } catch {
+          // ignore
+        }
+        delete modelsRef.current[key];
+      });
     };
   }, []);
 
@@ -290,6 +419,7 @@ const DesignEditor: React.FC = () => {
   };
 
   const editorDidMount = (editor: any) => {
+    editorRef.current = editor;
     editor.createContextKey('showTplHelperAction', true);
     editor.addAction({
       // id
@@ -309,12 +439,20 @@ const DesignEditor: React.FC = () => {
         getTplHelpers();
       },
     });
+    // 如果挂载时已有 active tab 的内容，切换到对应 model
+    if (activeTab && tabDataRef.current[activeTab]) {
+      switchToTabModel(activeTab, tabDataRef.current[activeTab].fileInfo, code);
+    }
   };
 
   const onChangeCode = (newCode: string) => {
     if (code !== newCode) {
       setCode(newCode);
-      unsave = true;
+      if (activeTab && tabDataRef.current[activeTab]) {
+        tabDataRef.current[activeTab].unsave = true;
+        tabDataRef.current[activeTab].code = newCode;
+        forceRender();
+      }
     }
   };
 
@@ -323,7 +461,11 @@ const DesignEditor: React.FC = () => {
     fileInfo.package = designInfo.package;
     fileInfo.update_content = true;
     fileInfo.type = fileType;
-    unsave = false;
+    // Update tab data
+    if (activeTab && tabDataRef.current[activeTab]) {
+      tabDataRef.current[activeTab].unsave = false;
+      forceRender();
+    }
     const hide = message.loading(
       intl.formatMessage({ id: 'setting.system.submitting' }),
       0,
@@ -331,6 +473,10 @@ const DesignEditor: React.FC = () => {
     saveDesignFileInfo(fileInfo)
       .then((res) => {
         message.info(res.msg);
+        // Update tab data loaded status
+        if (activeTab && tabDataRef.current[activeTab]) {
+          tabDataRef.current[activeTab].fileInfo = { ...fileInfo };
+        }
         actionRef.current?.reload();
       })
       .finally(() => {
@@ -342,23 +488,126 @@ const DesignEditor: React.FC = () => {
     window.scrollTo(window.pageXOffset, 0);
   };
 
+  const openNewTab = (type: string, info: any, key: string) => {
+    // Save current tab data
+    saveActiveTabData();
+    // Add new tab
+    const label = info.path.split('/').pop() || info.path;
+    setTabs((prev) => [...prev, { key, path: info.path, type, label }]);
+    setActiveTab(key);
+    fileType = type;
+    fetchDesignFileInfo(info.path, key);
+    scrollToTop();
+  };
+
+  const handleTabChange = (key: string) => {
+    if (key === activeTab) return;
+    // Save current tab data
+    saveActiveTabData();
+    // Switch to new tab
+    setActiveTab(key);
+    const tab = tabs.find((t) => t.key === key);
+    if (tab) {
+      fileType = tab.type;
+      restoreActiveTabData(key);
+      // 切到目标 tab 的独立 model（恢复该 tab 各自的滚动位置/光标）
+      const data = tabDataRef.current[key];
+      if (data) {
+        switchToTabModel(key, data.fileInfo, data.code);
+      }
+      scrollToTop();
+    }
+  };
+
   const handleEditFile = (type: string, info: any) => {
-    if (unsave) {
+    const key = info.path;
+    // Check if tab already open
+    const existingIndex = tabs.findIndex((t) => t.key === key);
+    if (existingIndex !== -1) {
+      // Tab already open, switch to it
+      handleTabChange(key);
+      scrollToTop();
+      return;
+    }
+
+    // Check if current tab has unsaved changes
+    const currentTabData = activeTab ? tabDataRef.current[activeTab] : null;
+    if (currentTabData?.unsave) {
       Modal.confirm({
         title: intl.formatMessage({ id: 'design.editor.confirm-giveup' }),
         content: intl.formatMessage({
           id: 'design.editor.confirm-giveup.content',
         }),
         onOk: () => {
-          fileType = type;
-          fetchDesignFileInfo(info.path);
-          scrollToTop();
+          openNewTab(type, info, key);
         },
       });
     } else {
-      fileType = type;
-      fetchDesignFileInfo(info.path);
-      scrollToTop();
+      openNewTab(type, info, key);
+    }
+  };
+
+  const doRemoveTab = (targetKey: string) => {
+    const remainingTabs = tabs.filter((t) => t.key !== targetKey);
+    // Clean up tab data
+    delete tabDataRef.current[targetKey];
+    // 释放被关闭 tab 的独立 model，避免内存泄漏与脏装饰器残留
+    const model = modelsRef.current[targetKey];
+    if (model) {
+      model.dispose();
+      delete modelsRef.current[targetKey];
+    }
+    delete viewStatesRef.current[targetKey];
+
+    if (remainingTabs.length === 0) {
+      setTabs([]);
+      setActiveTab('');
+      setCode('');
+      setFileInfo({});
+      setLoaded(false);
+      return;
+    }
+
+    // Determine next active tab
+    let nextKey = activeTab;
+    if (targetKey === activeTab) {
+      const removedIndex = tabs.findIndex((t) => t.key === targetKey);
+      const nextTab =
+        remainingTabs[Math.min(removedIndex, remainingTabs.length - 1)];
+      nextKey = nextTab.key;
+    }
+
+    setTabs(remainingTabs);
+    setActiveTab(nextKey);
+    const nextTab = remainingTabs.find((t) => t.key === nextKey);
+    if (nextTab) {
+      fileType = nextTab.type;
+      restoreActiveTabData(nextKey);
+      // 切到下一个 tab 的独立 model（恢复其滚动位置/光标）
+      const data = tabDataRef.current[nextKey];
+      if (data) {
+        switchToTabModel(nextKey, data.fileInfo, data.code);
+      }
+    }
+  };
+
+  const handleTabRemove = (targetKey: string) => {
+    const tab = tabs.find((t) => t.key === targetKey);
+    if (!tab) return;
+
+    const tabData = tabDataRef.current[targetKey];
+    if (tabData?.unsave) {
+      Modal.confirm({
+        title: intl.formatMessage({ id: 'design.editor.confirm-giveup' }),
+        content: intl.formatMessage({
+          id: 'design.editor.confirm-giveup.content',
+        }),
+        onOk: () => {
+          doRemoveTab(targetKey);
+        },
+      });
+    } else {
+      doRemoveTab(targetKey);
     }
   };
 
@@ -397,7 +646,7 @@ const DesignEditor: React.FC = () => {
         })
           .then((res) => {
             message.info(res.msg);
-            fetchDesignFileInfo(info.path);
+            fetchDesignFileInfo(info.path, activeTab);
           })
           .finally(() => {
             hide();
@@ -441,7 +690,8 @@ const DesignEditor: React.FC = () => {
   };
 
   const handleGoBack = () => {
-    if (unsave) {
+    const currentTabData = activeTab ? tabDataRef.current[activeTab] : null;
+    if (currentTabData?.unsave) {
       Modal.confirm({
         title: intl.formatMessage({ id: 'design.editor.confirm-goback' }),
         content: intl.formatMessage({
@@ -465,16 +715,6 @@ const DesignEditor: React.FC = () => {
     }
 
     return (size / 1024 / 1024).toFixed(2) + 'MB';
-  };
-
-  const getLanguage = (filePath: string) => {
-    return filePath.indexOf('.html') !== -1
-      ? 'html'
-      : filePath.indexOf('.css') !== -1
-      ? 'css'
-      : filePath.indexOf('.yml') !== -1
-      ? 'yaml'
-      : 'javascript';
   };
 
   const handleAddCode = (addCode: any, docLink: string) => {
@@ -564,20 +804,45 @@ const DesignEditor: React.FC = () => {
     <PageContainer
       title={
         <div>
-          <FormattedMessage id="design.editing" />: {fileInfo?.path}
+          <FormattedMessage id="design.editing" />:{' '}
+          {activeTab
+            ? tabs.find((t) => t.key === activeTab)?.path || fileInfo?.path
+            : fileInfo?.path}
         </div>
       }
     >
       <Card className="design-editor-card">
         <Row gutter={16}>
           <Col sm={18} xs={24}>
+            {tabs.length > 0 && (
+              <Tabs
+                type="editable-card"
+                hideAdd
+                activeKey={activeTab}
+                onChange={handleTabChange}
+                onEdit={(targetKey) => handleTabRemove(targetKey as string)}
+                size="small"
+                items={tabs.map((tab) => ({
+                  key: tab.key,
+                  label: (
+                    <span>
+                      {tab.label}
+                      {tabDataRef.current[tab.key]?.unsave && (
+                        <span style={{ color: '#ff4d4f', marginLeft: 2 }}>
+                          *
+                        </span>
+                      )}
+                    </span>
+                  ),
+                }))}
+                style={{ marginBottom: 8 }}
+              />
+            )}
             <div className="code-editor-box" onKeyDown={handleKeyDown}>
               {loaded && (
                 <MonacoEditor
                   height={height}
-                  language={getLanguage(fileInfo?.path || '')}
                   theme="vs-dark"
-                  value={code}
                   options={{
                     selectOnLineNumbers: false,
                     wordWrap: 'on',

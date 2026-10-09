@@ -1,5 +1,4 @@
 import AttachmentSelect from '@/components/attachment';
-import { getAttachmentCategories } from '@/services';
 import { getCategories } from '@/services/category';
 import {
   getCollectorSetting,
@@ -36,6 +35,7 @@ class CollectorSetting extends React.Component<CollectorSettingProps> {
     insertImage: 0,
     collect_mode: 0,
     proxyOpen: false,
+    categories: [],
   };
 
   componentDidMount() {
@@ -71,6 +71,11 @@ class CollectorSetting extends React.Component<CollectorSettingProps> {
         insertImage: setting.insert_image,
         collect_mode: setting.collect_mode || 0,
         proxyOpen: setting.proxy_config?.open || false,
+      });
+    });
+    getCategories().then((res) => {
+      this.setState({
+        categories: res.data,
       });
     });
   }
@@ -159,13 +164,13 @@ class CollectorSetting extends React.Component<CollectorSettingProps> {
     for (const row of rows) {
       let exists = false;
       for (let i in setting['images']) {
-        if (setting['images'][i] === row.logo) {
+        if (setting['images'][i] === row.file_path) {
           exists = true;
           break;
         }
       }
       if (!exists) {
-        setting['images'].push(row.logo);
+        setting['images'].push(row.file_path);
       }
     }
     this.setState({
@@ -194,6 +199,7 @@ class CollectorSetting extends React.Component<CollectorSettingProps> {
       insertImage,
       collect_mode,
       proxyOpen,
+      categories,
     } = this.state;
 
     return (
@@ -300,7 +306,9 @@ class CollectorSetting extends React.Component<CollectorSettingProps> {
                 label={this.props.intl.formatMessage({
                   id: 'plugin.collector.source',
                 })}
-                placeholder="如：https://cn.bing.com/search?q=%s"
+                placeholder={this.props.intl.formatMessage({
+                  id: 'plugin.collector.source.placeholder',
+                })}
                 extra={
                   <div>
                     <FormattedMessage id="plugin.collector.source.description" />
@@ -323,24 +331,42 @@ class CollectorSetting extends React.Component<CollectorSettingProps> {
                   </span>
                 </div>
               }
-              request={async () => {
-                const res = await getCategories({ type: 1 });
-                return res.data || [];
-              }}
+              options={[
+                {
+                  title: this.props.intl.formatMessage({
+                    id: 'content.please-select',
+                  }),
+                  value: 0,
+                  status: 1,
+                },
+              ]
+                .concat(categories)
+                .map((cat: any) => ({
+                  title: cat.title,
+                  label: (
+                    <div title={cat.title}>
+                      {cat.parents?.length > 0 ? (
+                        <span className="text-muted">
+                          {cat.parents
+                            ?.map((parent: any) => parent.title)
+                            .join(' > ')}
+                          {' > '}
+                        </span>
+                      ) : (
+                        ''
+                      )}
+                      {cat.title}
+                    </div>
+                  ),
+                  value: cat.id,
+                  disabled: cat.status !== 1,
+                }))}
               fieldProps={{
-                fieldNames: {
-                  label: 'title',
-                  value: 'id',
-                },
-                optionItemRender(item: any) {
-                  return (
-                    <div
-                      dangerouslySetInnerHTML={{
-                        __html: item.spacer + item.title,
-                      }}
-                    ></div>
-                  );
-                },
+                showSearch: true,
+                filterOption: (input: string, option: any) =>
+                  (option?.title ?? option?.label)
+                    .toLowerCase()
+                    .includes(input.toLowerCase()),
               }}
             />
             <ProFormRadio.Group
@@ -691,7 +717,7 @@ class CollectorSetting extends React.Component<CollectorSettingProps> {
                   id: 'plugin.aigenerate.image.category.description',
                 })}
                 request={async () => {
-                  const res = await getAttachmentCategories();
+                  const res = await getCategories();
                   const data = (res.data || []).concat(
                     {
                       id: 0,

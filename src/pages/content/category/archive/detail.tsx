@@ -3,8 +3,6 @@ import AiGenerate from '@/components/aiGenerate';
 import AiGetTdk from '@/components/aitdk';
 import AttachmentSelect from '@/components/attachment';
 import CollapseItem from '@/components/collaspeItem';
-import MarkdownEditor from '@/components/markdown';
-import NewAiEditor from '@/components/newAiEditor';
 import {
   anqiExtractDescription,
   getArchives,
@@ -20,6 +18,7 @@ import {
   DownOutlined,
   LeftOutlined,
   PlusOutlined,
+  QuestionCircleOutlined,
   RightOutlined,
   UpOutlined,
 } from '@ant-design/icons';
@@ -39,20 +38,24 @@ import {
   Card,
   Col,
   Image,
+  message,
   Modal,
+  Popover,
   Row,
   Space,
   Tag,
-  message,
 } from 'antd';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import '../index.less';
+const MarkdownEditor = lazy(() => import('@/components/markdown'));
+const NewAiEditor = lazy(() => import('@/components/newAiEditor'));
+const SimpleEditor = lazy(() => import('@/components/simpleEditor'));
 
 const categoryType = 1;
 
 const ArchiveCategoryDetail: React.FC = () => {
   const formRef = useRef<ProFormInstance>();
-  const editorRef = useRef(null);
+  const editorRef = useRef<any>(null);
   const [content, setContent] = useState<string>('');
   const [categoryImages, setCategoryImages] = useState<string[]>([]);
   const [categoryLogo, setCategoryLogo] = useState<string>('');
@@ -65,6 +68,7 @@ const ArchiveCategoryDetail: React.FC = () => {
   const [loaded, setLoaded] = useState<boolean>(false);
   const [category, setCategory] = useState<any>({ status: 1 });
   const [modules, setModules] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [searchArchives, setSearchArchives] = useState<any[]>([
     {
       id: 0,
@@ -77,6 +81,7 @@ const ArchiveCategoryDetail: React.FC = () => {
   const [aiTitle, setAiTitle] = useState<string>('');
   const [aiVisible, setAiVisible] = useState<boolean>(false);
   const [aiTdkVisible, setAiTdkVisible] = useState<boolean>(false);
+  const [dragImageIndex, setDragImageIndex] = useState<number>(-1);
   const [newKey, setNewKey] = useState<string>('');
 
   const changeModule = (e: any, tmpModels?: any) => {
@@ -158,6 +163,9 @@ const ArchiveCategoryDetail: React.FC = () => {
       setContentSetting(res.data || {});
       setLoaded(true);
     });
+    getCategories({}).then((res) => {
+      setCategories(res.data || []);
+    });
   };
 
   const onTabChange = (key: string) => {
@@ -216,32 +224,80 @@ const ArchiveCategoryDetail: React.FC = () => {
   };
 
   const handleSelectImages = (rows: any) => {
+    const images = [...categoryImages];
     for (const row of rows) {
       let exists = false;
-      for (let i in categoryImages) {
-        if (categoryImages[i] === row.logo) {
+      for (let i in images) {
+        if (images[i] === row.file_path) {
           exists = true;
           break;
         }
       }
       if (!exists) {
-        categoryImages.push(row.logo);
+        images.push(row.file_path);
       }
     }
-    setCategoryImages([].concat(categoryImages));
+    setCategoryImages(images);
     message.success(
       intl.formatMessage({ id: 'setting.system.upload-success' }),
     );
   };
 
+  const handleDragStart = (index: number) => {
+    setDragImageIndex(index);
+  };
+
+  const handleDragOver = (e: any, index: number) => {
+    e.preventDefault();
+    if (dragImageIndex === -1 || dragImageIndex === index) {
+      return;
+    }
+    const images = [...categoryImages];
+    const [moved] = images.splice(dragImageIndex, 1);
+    images.splice(index, 0, moved);
+    setDragImageIndex(index);
+    setCategoryImages(images);
+  };
+
+  const handleDragEnd = () => {
+    setDragImageIndex(-1);
+  };
+
+  const handleDrop = (e: any) => {
+    e.preventDefault();
+    handleDragEnd();
+  };
+
+  const handleMoveImages = (index: number, direction: string, e: any) => {
+    e.stopPropagation();
+    const images = [...categoryImages];
+    if (direction === 'up') {
+      if (index <= 0) {
+        return;
+      }
+      const temp = images[index];
+      images[index] = images[index - 1];
+      images[index - 1] = temp;
+    } else {
+      if (index >= images.length - 1) {
+        return;
+      }
+      const temp = images[index];
+      images[index] = images[index + 1];
+      images[index + 1] = temp;
+    }
+    setCategoryImages(images);
+  };
+
   const handleCleanImages = (index: number, e: any) => {
     e.stopPropagation();
-    categoryImages.splice(index, 1);
-    setCategoryImages([].concat(categoryImages));
+    const images = [...categoryImages];
+    images.splice(index, 1);
+    setCategoryImages(images);
   };
 
   const handleSelectLogo = (row: any) => {
-    setCategoryLogo(row.logo);
+    setCategoryLogo(row.file_path);
     message.success(
       intl.formatMessage({ id: 'setting.system.upload-success' }),
     );
@@ -263,19 +319,29 @@ const ArchiveCategoryDetail: React.FC = () => {
     formRef.current?.setFieldsValue({ extra });
 
     delete category.extra[field];
-    setCategory(category);
+    setCategory((prev: any) => ({
+      ...prev,
+      extra: {
+        ...category.extra,
+      },
+    }));
   };
 
   const handleUploadExtraField = (field: string, row: any) => {
     const extra: any = {};
-    extra[field] = row.logo;
+    extra[field] = row.file_path;
     formRef.current?.setFieldsValue({ extra });
     if (!category.extra[field]) {
       category.extra[field] = null;
     }
-    category.extra[field] = row.logo;
+    category.extra[field] = row.file_path;
 
-    setCategory(category);
+    setCategory((prev: any) => ({
+      ...prev,
+      extra: {
+        ...category.extra,
+      },
+    }));
   };
 
   const handleMoveExtraFieldItem = (
@@ -298,7 +364,12 @@ const ArchiveCategoryDetail: React.FC = () => {
       category.extra[field][index] = category.extra[field][index + 1];
       category.extra[field][index + 1] = temp;
     }
-    setCategory(Object.assign({}, category));
+    setCategory((prev: any) => ({
+      ...prev,
+      extra: {
+        ...category.extra,
+      },
+    }));
   };
 
   const handleCleanExtraFieldItem = (field: string, index: number) => {
@@ -307,7 +378,12 @@ const ArchiveCategoryDetail: React.FC = () => {
     extra[field] = category.extra[field];
     formRef?.current?.setFieldsValue({ extra });
 
-    setCategory(Object.assign({}, category));
+    setCategory((prev: any) => ({
+      ...prev,
+      extra: {
+        ...category.extra,
+      },
+    }));
   };
 
   const handleUploadExtraFieldItem = (field: string, rows: any) => {
@@ -317,20 +393,25 @@ const ArchiveCategoryDetail: React.FC = () => {
     for (const row of rows) {
       let exists = false;
       for (const i in category.extra[field]) {
-        if (category.extra[field][i] === row.logo) {
+        if (category.extra[field][i] === row.file_path) {
           exists = true;
           break;
         }
       }
       if (!exists) {
-        category.extra[field].push(row.logo);
+        category.extra[field].push(row.file_path);
       }
     }
     const extra: any = {};
     extra[field] = category.extra[field];
     formRef?.current?.setFieldsValue({ extra });
 
-    setCategory(Object.assign({}, category));
+    setCategory((prev: any) => ({
+      ...prev,
+      extra: {
+        ...category.extra,
+      },
+    }));
   };
 
   const onAddExtraTextsField = (field: string) => {
@@ -344,7 +425,12 @@ const ArchiveCategoryDetail: React.FC = () => {
     const extra: any = {};
     extra[field] = category.extra[field];
     formRef?.current?.setFieldsValue({ extra });
-    setCategory(Object.assign({}, category));
+    setCategory((prev: any) => ({
+      ...prev,
+      extra: {
+        ...category.extra,
+      },
+    }));
   };
 
   const onChangeExtraTextsField = (
@@ -360,7 +446,12 @@ const ArchiveCategoryDetail: React.FC = () => {
     const extra: any = {};
     extra[field] = { idx: { keyName: value } };
     formRef?.current?.setFieldsValue({ extra });
-    setCategory(category);
+    setCategory((prev: any) => ({
+      ...prev,
+      extra: {
+        ...category.extra,
+      },
+    }));
   };
 
   const onMoveUpExtraTextsField = (field: string, idx: number) => {
@@ -372,7 +463,12 @@ const ArchiveCategoryDetail: React.FC = () => {
       const extra: any = {};
       extra[field] = category.extra[field];
       formRef?.current?.setFieldsValue({ extra });
-      setCategory(Object.assign({}, category));
+      setCategory((prev: any) => ({
+        ...prev,
+        extra: {
+          ...category.extra,
+        },
+      }));
     }
   };
 
@@ -385,7 +481,12 @@ const ArchiveCategoryDetail: React.FC = () => {
       const extra: any = {};
       extra[field] = category.extra[field];
       formRef?.current?.setFieldsValue({ extra });
-      setCategory(Object.assign({}, category));
+      setCategory((prev: any) => ({
+        ...prev,
+        extra: {
+          ...category.extra,
+        },
+      }));
     }
   };
 
@@ -403,7 +504,12 @@ const ArchiveCategoryDetail: React.FC = () => {
         } else {
           category.extra[field].splice(idx, 1);
         }
-        setCategory(Object.assign({}, category));
+        setCategory((prev: any) => ({
+          ...prev,
+          extra: {
+            ...category.extra,
+          },
+        }));
         const extra: any = {};
         extra[field] = category.extra[field];
         formRef?.current?.setFieldsValue({ extra });
@@ -556,52 +662,50 @@ const ArchiveCategoryDetail: React.FC = () => {
                   label={intl.formatMessage({ id: 'content.category.parent' })}
                   name="parent_id"
                   width="lg"
-                  request={async () => {
-                    let res = await getCategories({ type: categoryType });
-                    let categories = res.data || [];
-                    // 排除自己
-                    if (category.id) {
-                      let tmpCategory = [];
-                      for (let i in categories) {
-                        if (
-                          categories[i].id === category.id ||
-                          categories[i].parent_id === category.id ||
-                          categories[i].module_id !== category.module_id
-                        ) {
-                          continue;
-                        }
-                        tmpCategory.push(categories[i]);
-                      }
-                      categories = tmpCategory;
-                    }
-                    categories = [
-                      {
-                        id: 0,
-                        title: intl.formatMessage({
-                          id: 'content.category.top',
-                        }),
-                        spacer: '',
-                      },
-                    ].concat(categories);
-                    return categories;
-                  }}
-                  readonly={
-                    category.id || category.module_id > 0 ? false : true
-                  }
+                  options={[
+                    {
+                      id: 0,
+                      title: intl.formatMessage({
+                        id: 'content.category.top',
+                      }),
+                      status: 1,
+                    },
+                  ]
+                    .concat(
+                      categories.filter((item) =>
+                        category.id > 0
+                          ? item.module_id === category.module_id &&
+                            item.id !== category.id &&
+                            item.parent_id !== category.id
+                          : true,
+                      ),
+                    )
+                    .map((cat: any) => ({
+                      title: cat.title,
+                      label: (
+                        <div title={cat.title}>
+                          {cat.parents?.length > 0 ? (
+                            <span className="text-muted">
+                              {cat.parents
+                                .map((parent: any) => parent.title)
+                                .join(' > ')}
+                              {' > '}
+                            </span>
+                          ) : (
+                            ''
+                          )}
+                          {cat.title}
+                        </div>
+                      ),
+                      value: cat.id,
+                      disabled: cat.status !== 1,
+                    }))}
                   fieldProps={{
-                    fieldNames: {
-                      label: 'title',
-                      value: 'id',
-                    },
-                    optionItemRender(item: any) {
-                      return (
-                        <div
-                          dangerouslySetInnerHTML={{
-                            __html: (item.spacer || '') + item.title,
-                          }}
-                        ></div>
-                      );
-                    },
+                    showSearch: true,
+                    filterOption: (input: string, option: any) =>
+                      (option?.title ?? option?.label)
+                        .toLowerCase()
+                        .includes(input.toLowerCase()),
                   }}
                 />
                 <ProFormText
@@ -638,9 +742,30 @@ const ArchiveCategoryDetail: React.FC = () => {
                   placeholder={intl.formatMessage({
                     id: 'content.category.seo-title.placeholder',
                   })}
-                  extra={intl.formatMessage({
-                    id: 'content.category.seo-title.description',
-                  })}
+                  extra={
+                    <div>
+                      {intl.formatMessage({
+                        id: 'content.category.seo-title.description',
+                      })}
+                      {', '}
+                      <FormattedMessage id="setting.index.title.tips" />
+                      <Popover
+                        content={
+                          <div style={{ whiteSpace: 'pre-wrap' }}>
+                            {intl.formatMessage({
+                              id: 'setting.index.params.tips',
+                            })}
+                          </div>
+                        }
+                        title={intl.formatMessage({
+                          id: 'setting.index.title.tips',
+                        })}
+                      >
+                        {' '}
+                        <QuestionCircleOutlined />
+                      </Popover>
+                    </div>
+                  }
                 />
                 <ProFormText
                   name="keywords"
@@ -683,7 +808,17 @@ const ArchiveCategoryDetail: React.FC = () => {
                       {currentModule.category_fields?.map(
                         (item: any, index: number) =>
                           item.type !== 'editor' && (
-                            <Col sm={12} xs={24} key={index}>
+                            <Col
+                              sm={
+                                item.type === 'timeline' ||
+                                item.type === 'images' ||
+                                item.type === 'texts'
+                                  ? 24
+                                  : 12
+                              }
+                              xs={24}
+                              key={index}
+                            >
                               {item.type === 'text' ? (
                                 <ProFormText
                                   name={['extra', item.field_name]}
@@ -1049,35 +1184,48 @@ const ArchiveCategoryDetail: React.FC = () => {
                                     showSearch
                                     name={['extra', item.field_name]}
                                     mode={'single'}
-                                    request={async () => {
-                                      const res = await getCategories({
-                                        type: 1,
-                                      });
-                                      const categories = (res.data || []).map(
-                                        (cat: any) => ({
-                                          spacer: cat.spacer,
-                                          label:
-                                            cat.title +
-                                            (cat.status === 1
-                                              ? ''
-                                              : intl.formatMessage({
-                                                  id: 'setting.nav.hide',
-                                                })),
-                                          value: cat.id,
+                                    options={[
+                                      {
+                                        title: intl.formatMessage({
+                                          id: 'content.please-select',
                                         }),
-                                      );
-                                      return categories;
-                                    }}
-                                    fieldProps={{
-                                      optionItemRender(item: any) {
-                                        return (
-                                          <div
-                                            dangerouslySetInnerHTML={{
-                                              __html: item.spacer + item.label,
-                                            }}
-                                          ></div>
-                                        );
+                                        value: 0,
+                                        status: 1,
                                       },
+                                    ]
+                                      .concat(categories)
+                                      .map((cat: any) => ({
+                                        title: cat.title,
+                                        label: (
+                                          <div title={cat.title}>
+                                            {cat.parents?.length > 0 ? (
+                                              <span className="text-muted">
+                                                {cat.parents
+                                                  ?.map(
+                                                    (parent: any) =>
+                                                      parent.title,
+                                                  )
+                                                  .join(' > ')}
+                                                {' > '}
+                                              </span>
+                                            ) : (
+                                              ''
+                                            )}
+                                            {cat.title}
+                                          </div>
+                                        ),
+                                        value: cat.id,
+                                        disabled: cat.status !== 1,
+                                      }))}
+                                    fieldProps={{
+                                      showSearch: true,
+                                      filterOption: (
+                                        input: string,
+                                        option: any,
+                                      ) =>
+                                        (option?.title ?? option?.label)
+                                          .toLowerCase()
+                                          .includes(input.toLowerCase()),
                                     }}
                                   />
                                 </ProFormText>
@@ -1100,27 +1248,40 @@ const ArchiveCategoryDetail: React.FC = () => {
                               }) + item.content
                             }
                           >
-                            {contentSetting.editor === 'markdown' ? (
-                              <MarkdownEditor
-                                className="mb-normal"
-                                setContent={(html) =>
-                                  updateExtraContent(item.field_name, html)
-                                }
-                                content={extraContent[item.field_name] || ''}
-                                ref={null}
-                              />
-                            ) : (
-                              <NewAiEditor
-                                className="mb-normal"
-                                setContent={(html) =>
-                                  updateExtraContent(item.field_name, html)
-                                }
-                                content={extraContent[item.field_name] || ''}
-                                key={item.field_name}
-                                field={item.field_name}
-                                ref={null}
-                              />
-                            )}
+                            <Suspense
+                              fallback={<div style={{ height: 500 }} />}
+                            >
+                              {contentSetting.editor === 'markdown' ? (
+                                <MarkdownEditor
+                                  className="mb-normal"
+                                  setContent={(html) =>
+                                    updateExtraContent(item.field_name, html)
+                                  }
+                                  content={extraContent[item.field_name] || ''}
+                                  ref={null}
+                                />
+                              ) : contentSetting.editor === 'simple' ? (
+                                <SimpleEditor
+                                  className="mb-normal"
+                                  setContent={(html) =>
+                                    updateExtraContent(item.field_name, html)
+                                  }
+                                  content={extraContent[item.field_name] || ''}
+                                  ref={null}
+                                />
+                              ) : (
+                                <NewAiEditor
+                                  className="mb-normal"
+                                  setContent={(html) =>
+                                    updateExtraContent(item.field_name, html)
+                                  }
+                                  content={extraContent[item.field_name] || ''}
+                                  key={item.field_name}
+                                  field={item.field_name}
+                                  ref={null}
+                                />
+                              )}
+                            </Suspense>
                           </ProFormText>
                         ) : (
                           ''
@@ -1131,23 +1292,38 @@ const ArchiveCategoryDetail: React.FC = () => {
                 {loaded && (
                   <>
                     {contentSetting.editor === 'markdown' ? (
-                      <MarkdownEditor
-                        className="mb-normal"
-                        setContent={async (html: string) => {
-                          setContent(html);
-                        }}
-                        content={content}
-                        ref={editorRef}
-                      />
+                      <Suspense fallback={<div style={{ height: 500 }} />}>
+                        <MarkdownEditor
+                          className="mb-normal"
+                          setContent={async (html: string) => {
+                            setContent(html);
+                          }}
+                          content={content}
+                          ref={editorRef}
+                        />
+                      </Suspense>
+                    ) : contentSetting.editor === 'simple' ? (
+                      <Suspense fallback={<div style={{ height: 500 }} />}>
+                        <SimpleEditor
+                          className="mb-normal"
+                          setContent={async (html: string) => {
+                            setContent(html);
+                          }}
+                          content={content}
+                          ref={editorRef}
+                        />
+                      </Suspense>
                     ) : (
-                      <NewAiEditor
-                        className="mb-normal"
-                        setContent={async (html: string) => setContent(html)}
-                        key="content"
-                        field="content"
-                        content={content}
-                        ref={editorRef}
-                      />
+                      <Suspense fallback={<div style={{ height: 500 }} />}>
+                        <NewAiEditor
+                          className="mb-normal"
+                          setContent={async (html: string) => setContent(html)}
+                          key="content"
+                          field="content"
+                          content={content}
+                          ref={editorRef}
+                        />
+                      </Suspense>
                     )}
                   </>
                 )}
@@ -1205,19 +1381,44 @@ const ArchiveCategoryDetail: React.FC = () => {
                 >
                   {categoryImages.length
                     ? categoryImages.map((item: string, index: number) => (
-                        <div className="ant-upload-item" key={index}>
+                        <div
+                          className={
+                            'ant-upload-item' +
+                            (dragImageIndex === index ? ' drag-over' : '')
+                          }
+                          key={index}
+                          draggable
+                          onDragStart={() => handleDragStart(index)}
+                          onDragOver={(e) => handleDragOver(e, index)}
+                          onDragEnd={() => handleDragEnd}
+                          onDrop={(e) => handleDrop(e)}
+                        >
                           <Image
                             preview={{
                               src: item,
                             }}
                             src={item}
                           />
-                          <span
-                            className="delete"
-                            onClick={handleCleanImages.bind(this, index)}
-                          >
-                            <DeleteOutlined />
-                          </span>
+                          <div className="ant-upload-item-action">
+                            <Tag
+                              onClick={(e) => handleMoveImages(index, 'up', e)}
+                            >
+                              <LeftOutlined />
+                            </Tag>
+                            <Tag
+                              color="red"
+                              onClick={(e) => handleCleanImages(index, e)}
+                            >
+                              <DeleteOutlined />
+                            </Tag>
+                            <Tag
+                              onClick={(e) =>
+                                handleMoveImages(index, 'down', e)
+                              }
+                            >
+                              <RightOutlined />
+                            </Tag>
+                          </div>
                         </div>
                       ))
                     : null}

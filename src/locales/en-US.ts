@@ -1,4 +1,6 @@
 import account from './en-US/account';
+import ai from './en-US/ai';
+import common from './en-US/common';
 import component from './en-US/component';
 import content from './en-US/content';
 import dashboard from './en-US/dashboard';
@@ -23,8 +25,10 @@ export default {
   ...tool,
   ...website,
   ...account,
+  ...ai,
   ...statistic,
   ...design,
   ...content,
   ...plugin,
+  ...common,
 };

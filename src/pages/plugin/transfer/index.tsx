@@ -195,7 +195,7 @@ const PluginTransfer: React.FC = () => {
 
   return (
     <PageContainer>
-      <Card title={intl.formatMessage({ id: 'menu.plugin.transfer' })}>
+      <Card>
         <Alert
           style={{ marginBottom: '30px' }}
           message={intl.formatMessage({ id: 'plugin.transfer.tips' })}
@@ -257,6 +257,10 @@ const PluginTransfer: React.FC = () => {
                   {
                     value: 'empire',
                     label: 'EmpireCMS',
+                  },
+                  {
+                    value: 'xunruicms',
+                    label: 'XunruiCMS',
                   },
                 ]}
                 value={provider}
@@ -341,6 +345,15 @@ const PluginTransfer: React.FC = () => {
                       })}
                       placeholder={intl.formatMessage({
                         id: 'plugin.transfer.token.placeholder',
+                      })}
+                    />
+                    <ProFormText
+                      name="target_id"
+                      label={intl.formatMessage({
+                        id: 'plugin.transfer.site-id',
+                      })}
+                      placeholder={intl.formatMessage({
+                        id: 'plugin.transfer.site-id.placeholder',
                       })}
                     />
                   </ProForm>

@@ -8,11 +8,13 @@ import {
   getArchives,
   getModules,
   getSettingContent,
+  getTags,
   updateArchivesCategory,
   updateArchivesFlag,
   updateArchivesReleasePlan,
   updateArchivesSort,
   updateArchivesStatus,
+  updateArchivesTags,
   updateArchivesTime,
   updateArchivesAd,
 } from '@/services';
@@ -39,7 +41,6 @@ import {
   Button,
   Dropdown,
   Input,
-  Menu,
   Modal,
   Select,
   Space,
@@ -71,6 +72,7 @@ const ArchiveList: React.FC = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<any[]>([]);
   const [replaceVisible, setReplaceVisible] = useState<boolean>(false);
   const [flagVisible, setFlagVisible] = useState<boolean>(false);
+  const [tagVisible, setTagVisible] = useState<boolean>(false);
   const [statusVisible, setStatusVisible] = useState<boolean>(false);
   const [categoryVisible, setCategoryVisible] = useState<boolean>(false);
   const [timeVisible, setTimeVisible] = useState<boolean>(false);
@@ -87,6 +89,8 @@ const ArchiveList: React.FC = () => {
   const [newKey, setNewKey] = useState<string>('');
   const [isSubSite, setIsSubSite] = useState<boolean>(false);
   const [childrenOpen, setChildrenOpen] = useState<boolean>(false);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [searchedTags, setSearchedTags] = useState<any>({});
   const intl = useIntl();
 
   const flagEnum: any = {
@@ -115,6 +119,11 @@ const ArchiveList: React.FC = () => {
         { title: intl.formatMessage({ id: 'content.archive.all' }), id: 0 },
       ].concat(res.data || []),
     );
+    getCategories()
+      .then((res) => {
+        setCategories(res.data || []);
+      })
+      .catch();
   };
 
   const loadLatestUpdate = () => {
@@ -268,23 +277,21 @@ const ArchiveList: React.FC = () => {
 
   const handleSetCategory = async (values: any) => {
     let categoryIds = [];
-    let categoryId = 0;
-    if (typeof values.category_ids === 'number') {
-      // 单分类
-      categoryId = Number(values.category_ids);
-    } else {
-      for (let i in values.category_ids) {
-        if (values.category_ids[i] > 0) {
-          categoryIds.push(values.category_ids[i]);
-        }
-      }
-      if (categoryIds.length > 0) {
-        categoryId = categoryIds[0];
-      }
-    }
+    let categoryId = values.category_id;
     if (categoryId === 0) {
       message.error(intl.formatMessage({ id: 'content.category.required' }));
       return;
+    }
+    categoryIds.push(categoryId);
+    if (values.category_ids) {
+      for (let i in values.category_ids) {
+        if (
+          values.category_ids[i] > 0 &&
+          values.category_ids[i] !== categoryId
+        ) {
+          categoryIds.push(values.category_ids[i]);
+        }
+      }
     }
     const hide = message.loading(
       intl.formatMessage({ id: 'setting.system.submitting' }),
@@ -428,21 +435,21 @@ const ArchiveList: React.FC = () => {
     if (updating) {
       return;
     }
-    value = parseInt(value);
-    if (isNaN(value)) {
+    let valueNum = parseInt(value);
+    if (isNaN(valueNum)) {
       message.error(intl.formatMessage({ id: 'content.sort.required' }));
       return;
     }
-    if (value === record.sort) {
+    if (valueNum === record.sort) {
       return;
     }
-    if (value < 0) {
+    if (valueNum < 0) {
       message.error(intl.formatMessage({ id: 'content.sort.required' }));
       return;
     }
     updating = true;
     updateArchivesSort({
-      sort: value,
+      sort: valueNum,
       id: record.id,
     })
       .then((res) => {
@@ -553,6 +560,47 @@ const ArchiveList: React.FC = () => {
     });
   };
 
+  const onChangeTagInput = (e: any) => {
+    const value = e.target?.value || '';
+    getTags({
+      type: 1,
+      title: value,
+      pageSize: 10,
+    }).then((res) => {
+      const data = res.data || [];
+      const result: any = {};
+      for (const item of data) {
+        result[item.title] = item.title;
+      }
+      setSearchedTags(result);
+    });
+  };
+
+  const handleSetTag = async (values: any) => {
+    let tags = values.tags;
+    if (tags.length === 0) {
+      message.error(intl.formatMessage({ id: 'content.tag.required' }));
+      return;
+    }
+    const hide = message.loading(
+      intl.formatMessage({ id: 'setting.system.submitting' }),
+      0,
+    );
+    updateArchivesTags({
+      tags: tags,
+      ids: selectedRowKeys,
+    })
+      .then((res) => {
+        message.success(res.msg);
+        setTagVisible(false);
+        setSelectedRowKeys([]);
+        actionRef.current?.reload?.();
+      })
+      .finally(() => {
+        hide();
+      });
+  };
+
   const sortColumn: ProColumnType = {
     title: intl.formatMessage({ id: 'content.sort.name' }),
     dataIndex: 'sort',
@@ -648,7 +696,7 @@ const ArchiveList: React.FC = () => {
     },
     {
       title: intl.formatMessage({ id: 'content.category.name' }),
-      dataIndex: 'category_titles',
+      dataIndex: 'category_id',
       render: (_: any, entity) => {
         return (
           <div>
@@ -658,46 +706,45 @@ const ArchiveList: React.FC = () => {
           </div>
         );
       },
-      renderFormItem: (_, { fieldProps }) => {
-        return (
-          <ProFormSelect
-            name="category_id"
-            request={async () => {
-              let res = await getCategories({ type: 1 });
-              const categories = [
-                {
-                  spacer: '',
-                  title: intl.formatMessage({ id: 'content.category.all' }),
-                  id: 0,
-                  status: 1,
-                },
-              ]
-                .concat(res.data || [])
-                .map((cat: any) => ({
-                  spacer: cat.spacer,
-                  label:
-                    cat.title +
-                    (cat.status === 1
-                      ? ''
-                      : intl.formatMessage({ id: 'setting.nav.hide' })),
-                  value: cat.id,
-                }));
-              return categories;
-            }}
-            fieldProps={{
-              ...fieldProps,
-              optionItemRender(item: any) {
-                return (
-                  <div
-                    dangerouslySetInnerHTML={{
-                      __html: item.spacer + item.label,
-                    }}
-                  ></div>
-                );
-              },
-            }}
-          />
-        );
+      request: async () => {
+        let res = await getCategories({ type: 1 });
+        const categories = [
+          {
+            parents: [],
+            title: intl.formatMessage({ id: 'content.category.all' }),
+            id: 0,
+            status: 1,
+          },
+        ]
+          .concat(res.data || [])
+          .map((cat: any) => ({
+            title: cat.title,
+            label: (
+              <div title={cat.title}>
+                {cat.parents?.length > 0 ? (
+                  <span className="text-muted">
+                    {cat.parents
+                      ?.map((parent: any) => parent.title)
+                      .join(' > ')}
+                    {' > '}
+                  </span>
+                ) : (
+                  ''
+                )}
+                {cat.title}
+              </div>
+            ),
+            value: cat.id,
+            disabled: cat.status !== 1,
+          }));
+        return categories;
+      },
+      fieldProps: {
+        showSearch: true,
+        filterOption: (input: string, option: any) =>
+          (option?.title ?? option?.label)
+            .toLowerCase()
+            .includes(input.toLowerCase()),
       },
     },
     {
@@ -814,65 +861,80 @@ const ArchiveList: React.FC = () => {
           </a>
 
           <Dropdown
-            overlay={
-              <Menu>
-                <Menu.Item>
-                  <a
-                    onClick={() => {
-                      handleTranslateArchive(record);
-                    }}
-                    title={intl.formatMessage({
-                      id: 'content.action.translate.tips',
-                    })}
-                  >
-                    <FormattedMessage id="content.action.translate" />
-                  </a>
-                </Menu.Item>
-                <Menu.Item>
-                  <a
-                    onClick={() => {
-                      handleAiPseudoArchive(record);
-                    }}
-                    title={intl.formatMessage({
-                      id: 'content.action.aipseudo.tips',
-                    })}
-                  >
-                    <FormattedMessage id="content.action.aipseudo" />
-                  </a>
-                </Menu.Item>
-                <Menu.Item>
-                  <a
-                    onClick={() => {
-                      handleShowChildren(record);
-                    }}
-                  >
-                    <FormattedMessage id="content.children.btn" />
-                  </a>
-                </Menu.Item>
-                <Menu.Item>
-                  <a
-                    onClick={() => {
-                      handleCopyArchive(record);
-                    }}
-                    title={intl.formatMessage({
-                      id: 'content.action.copy.tips',
-                    })}
-                  >
-                    <FormattedMessage id="content.action.copy" />
-                  </a>
-                </Menu.Item>
-                <Menu.Item danger>
-                  <a
-                    className="text-red"
-                    onClick={async () => {
-                      await handleRemove([record.id]);
-                    }}
-                  >
-                    <FormattedMessage id="setting.system.delete" />
-                  </a>
-                </Menu.Item>
-              </Menu>
-            }
+            menu={{
+              items: [
+                {
+                  key: '1',
+                  label: (
+                    <a
+                      onClick={() => {
+                        handleTranslateArchive(record);
+                      }}
+                      title={intl.formatMessage({
+                        id: 'content.action.translate.tips',
+                      })}
+                    >
+                      <FormattedMessage id="content.action.translate" />
+                    </a>
+                  ),
+                },
+                {
+                  key: '2',
+                  label: (
+                    <a
+                      onClick={() => {
+                        handleAiPseudoArchive(record);
+                      }}
+                      title={intl.formatMessage({
+                        id: 'content.action.aipseudo.tips',
+                      })}
+                    >
+                      <FormattedMessage id="content.action.aipseudo" />
+                    </a>
+                  ),
+                },
+                {
+                  key: '3',
+                  label: (
+                    <a
+                      onClick={() => {
+                        handleShowChildren(record);
+                      }}
+                    >
+                      <FormattedMessage id="content.children.btn" />
+                    </a>
+                  ),
+                },
+                {
+                  key: '4',
+                  label: (
+                    <a
+                      onClick={() => {
+                        handleCopyArchive(record);
+                      }}
+                      title={intl.formatMessage({
+                        id: 'content.action.copy.tips',
+                      })}
+                    >
+                      <FormattedMessage id="content.action.copy" />
+                    </a>
+                  ),
+                },
+                {
+                  key: '5',
+                  label: (
+                    <a
+                      className="text-red"
+                      onClick={async () => {
+                        await handleRemove([record.id]);
+                      }}
+                    >
+                      <FormattedMessage id="setting.system.delete" />
+                    </a>
+                  ),
+                },
+              ],
+            }}
             key="more"
           >
             <a>
@@ -967,6 +1029,14 @@ const ArchiveList: React.FC = () => {
         }}
         tableAlertOptionRender={({ selectedRowKeys, onCleanSelected }) => (
           <Space wrap>
+            <Button
+              size={'small'}
+              onClick={async () => {
+                await setTagVisible(true);
+              }}
+            >
+              <FormattedMessage id="content.option.batch-add-tag" />
+            </Button>
             <Button
               size={'small'}
               onClick={async () => {
@@ -1078,6 +1148,7 @@ const ArchiveList: React.FC = () => {
           showSizeChanger: true,
           defaultCurrent: lastParams.current,
           defaultPageSize: lastParams.pageSize,
+          pageSizeOptions: ['10', '20', '50', '100', '200', '500'],
           showTotal: (total, range) => (
             <div>
               {lastParams.exact === false && (
@@ -1176,35 +1247,77 @@ const ArchiveList: React.FC = () => {
           onOpenChange={(e) => setCategoryVisible(e)}
         >
           <ProFormSelect
-            name="category_ids"
-            request={async () => {
-              let res = await getCategories({ type: 1 });
-              return [
-                {
-                  spacer: '',
-                  title: intl.formatMessage({ id: 'content.please-select' }),
-                  id: 0,
-                },
-              ].concat(res.data || []);
-            }}
+            name="category_id"
+            label={intl.formatMessage({
+              id: 'content.category.name',
+            })}
+            options={categories.map((cat: any) => ({
+              title: cat.title,
+              label: (
+                <div title={cat.title}>
+                  {cat.parents?.length > 0 ? (
+                    <span className="text-muted">
+                      {cat.parents
+                        ?.map((parent: any) => parent.title)
+                        .join(' > ')}
+                      {' > '}
+                    </span>
+                  ) : (
+                    ''
+                  )}
+                  {cat.title}
+                </div>
+              ),
+              value: cat.id,
+              disabled: cat.status !== 1,
+            }))}
             fieldProps={{
-              mode:
-                contentSetting.multi_category === 1 ? 'multiple' : undefined,
-              fieldNames: {
-                label: 'title',
-                value: 'id',
-              },
-              optionItemRender(item: any) {
-                return (
-                  <div
-                    dangerouslySetInnerHTML={{
-                      __html: item.spacer + item.title,
-                    }}
-                  ></div>
-                );
-              },
+              showSearch: true,
+              filterOption: (input: string, option: any) =>
+                (option?.title ?? option?.label)
+                  .toLowerCase()
+                  .includes(input.toLowerCase()),
             }}
           />
+          {contentSetting.multi_category === 1 && (
+            <ProFormSelect
+              name="category_ids"
+              mode="multiple"
+              label={intl.formatMessage({ id: 'content.archive.related-category' })}
+              options={categories.map((cat: any) => ({
+                title: cat.title,
+                label: (
+                  <div title={cat.title}>
+                    {cat.parents?.length > 0 ? (
+                      <span className="text-muted">
+                        {cat.parents
+                          ?.map((parent: any) => parent.title)
+                          .join(' > ')}
+                        {' > '}
+                      </span>
+                    ) : (
+                      ''
+                    )}
+                    {cat.title}
+                  </div>
+                ),
+                value: cat.id,
+                disabled: cat.status !== 1,
+              }))}
+              fieldProps={{
+                showSearch: true,
+                filterOption: (input: string, option: any) =>
+                  (option?.title ?? option?.label)
+                    .toLowerCase()
+                    .includes(input.toLowerCase()),
+              }}
+              extra={
+                <div>
+                  <FormattedMessage id="content.archive.related-category.description" />
+                </div>
+              }
+            />
+          )}
         </ModalForm>
       )}
       {releaseVisible && (
@@ -1360,6 +1473,30 @@ const ArchiveList: React.FC = () => {
             setChildrenOpen(flag);
           }}
         />
+      )}
+      {tagVisible && (
+        <ModalForm
+          width={480}
+          title={intl.formatMessage({ id: 'content.tag.name' })}
+          open={tagVisible}
+          onFinish={handleSetTag}
+          onOpenChange={(e) => setTagVisible(e)}
+        >
+          <ProFormSelect
+            mode="tags"
+            name="tags"
+            valueEnum={searchedTags}
+            placeholder={intl.formatMessage({
+              id: 'content.tag.placeholder',
+            })}
+            fieldProps={{
+              tokenSeparators: [',', '，'],
+              onInputKeyDown: onChangeTagInput,
+              onFocus: onChangeTagInput,
+            }}
+            extra={intl.formatMessage({ id: 'content.tag.placeholder' })}
+          />
+        </ModalForm>
       )}
     </NewContainer>
   );

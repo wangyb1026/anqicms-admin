@@ -21,6 +21,9 @@ export default {
   'setting.system.base-url-description':
     '指该网站的PC端访问网址，如：https://www.anqicms.com，用来生成全站的绝对地址',
   'setting.system.base-url-error': '请输入网站首页地址！',
+  'setting.system.front-url': '前台地址',
+  'setting.system.front-url-description':
+    '指该网站的前台访问网址，如：https://www.anqicms.com，如果是前后端分离的网站(如前台是Next.js)，且分别使用独立的域名，需要设置。',
   'setting.system.mobile-url': '移动端地址',
   'setting.system.mobile-url-description':
     '指该网站的手机端访问网址，如：https://m.anqicms.com，如果模板类型为PC+手机站，需要设置。',
@@ -81,8 +84,9 @@ export default {
   'setting.content.editor': '默认编辑器选择',
   'setting.content.editor.fulltext': '富文本编辑器',
   'setting.content.editor.markdown': 'Markdown编辑器',
+  'setting.content.editor.simple': '简易编辑器',
   'setting.content.editor.description':
-    '一般使用富文本编辑器即可，Markdown 使用门槛较高',
+    '一般使用富文本编辑器即可，Markdown 使用门槛较高。如需完全掌控html，可选用简易编辑器',
   'setting.content.remote-download': '下载远程图片',
   'setting.content.outlink-filter': '内容外链处理',
   'setting.content.outlink-filter.allow': '保留链接',
@@ -101,6 +105,9 @@ export default {
   'setting.content.archive-sort': '启用文档排序',
   'setting.content.archive-sort.description':
     '默认不启用文档排序支持，启用文档可能会导致网站加载变慢',
+  'setting.content.auto-match-tag': '自动添加文档标签',
+  'setting.content.auto-match-tag.description':
+    '在文章创建时，会自动匹配标签库',
   'setting.content.use-webp': '启用Webp图片格式',
   'setting.content.use-webp.description':
     '如果你希望上传的jpg、png等图片，都全部转为webp图片格式(可以减少体积),则选择启用。只对修改后的上传的图片生效。',
@@ -125,7 +132,7 @@ export default {
   'setting.content.quality.description':
     '图片质量只对jpg格式和webp格式生效。默认质量为90%',
   'setting.content.quality.plugin':
-    'GIF/PNG/WEBP 图片压缩处理需要依赖 ImageMagick/pngquant，如果你想得到更好的图片压缩质量，建议你在服务器上安装好 ImageMagick/pngquant。',
+    'GIF/PNG/WEBP/AVIF 图片压缩处理需要依赖 ImageMagick/pngquant，如果你想得到更好的图片压缩质量，建议你在服务器上安装好 ImageMagick/pngquant。',
   'setting.content.resize-image': '自动压缩大图',
   'setting.content.resize-width': '压缩到指定宽度',
   'setting.content.resize-width.placeholder': '默认：800',
@@ -191,6 +198,11 @@ export default {
   'setting.index.keywords': '首页关键词',
   'setting.index.keywords.tips': '多个关键词请用,隔开',
   'setting.index.description': '首页描述',
+  'setting.index.sep': 'SEO链接符',
+  'setting.index.sep.tips': '默认： - ',
+  'setting.index.title.tips': '支持使用变量',
+  'setting.index.params.tips':
+    '{sep} SEO链接符，默认“ - ”\n(第{page}页) 分页页码\n{siteName} 当前站点名称\n{catname} 当前分类名称\n{multicatname} 当前分类带层次的分类名称\n支持“当前内容”内置字段，不支持自定义字段，格式：{字段名}，\n如：{title}表示标题\t{keywords} 内容关键词\t{description} 内容描述信息',
   'setting.banner.name.require': '请填写分组名称',
   'setting.banner.confirm-delete': '确定要删除该Banner吗',
   'setting.banner.logo': '图片',
@@ -243,4 +255,95 @@ export default {
   'setting.nav.sort.description': '值越小，排序越靠前，默认99',
   'plugin.diyfield.setting': '字段配置',
   'setting.diyfield.name-duplicate': '参数名不能重复',
+  'setting.tab.base': '基础信息',
+  'setting.tab.address': '访问地址',
+  'setting.tab.runtime': '运行与SEO状态',
+  'setting.tab.content-base': '基础配置',
+  'setting.tab.list-rules': '列表与规则',
+  'setting.tab.image': '图片缩略图处理',
+  'setting.tab.security-base': '基础安全',
+  'setting.tab.security-comment': '留言/评论安全',
+  'setting.tab.social': '社媒信息',
+  'setting.tab.ai-writing': 'AI接口配置(写作/翻译)',
+  'setting.tab.ai-assistant': 'AI接口配置(AI助手)',
+  'setting.tab.mcp': 'MCP 开放接口',
+  'setting.ai.delete-success': '删除成功',
+  'setting.ai.delete-failed': '删除失败',
+  'setting.ai.save-success': '保存成功',
+  'setting.ai.save-failed': '保存失败',
+  'setting.ai.fill-endpoint-info': '请填写完整的接口信息',
+  'setting.ai.token-generate-first': '请先生成鉴权 Token',
+  'setting.ai.copied-to-clipboard': '配置已复制到剪贴板',
+  'setting.ai.copy-failed-manual': '复制失败，请手动复制',
+  'setting.ai.vip-more-ai': '更多AI接口为VIP功能，点击查看VIP',
+  'setting.ai.add-custom-endpoint': '添加自定义接口',
+  'setting.ai.no-custom-endpoint': '暂无自定义接口',
+  'setting.ai.edit-custom-endpoint': '编辑自定义接口',
+  'setting.ai.mcp-intro':
+    '启用后，第三方 AI 客户端（Claude Desktop、Cursor、Cherry Studio 等）可通过 MCP 协议调用本站点的{tools}意图工具，实现内容管理、SEO 优化等操作。端点地址：',
+  'setting.ai.mcp-tools-count': ' {count} 个',
+  'setting.ai.mcp-tools-all': '全部',
+  'setting.ai.copy-mcp-config': '一键复制配置',
+  'setting.ai.mcp-enable': '启用 MCP 开放接口',
+  'setting.ai.mcp-enable-description':
+    '开启后允许第三方 AI 通过 MCP 协议访问本站点',
+  'setting.ai.mcp-token-label': '鉴权 Token',
+  'setting.ai.mcp-token-placeholder': '点击右侧按钮生成随机 Token',
+  'setting.ai.mcp-token-extra':
+    "第三方 AI 调用时需在 Header 中携带 Authorization: Bearer '{token}'",
+  'setting.ai.mcp-generate-token': '生成随机 Token',
+  'setting.ai.mcp-rate-limit': '速率限制（次/分钟）',
+  'setting.ai.mcp-rate-limit-placeholder': '0 表示不限制',
+  'setting.ai.mcp-rate-limit-extra':
+    '防止第三方 AI 过度调用导致服务压力过大，0 表示不限制',
+  'setting.ai.mcp-exposed-tools': '允许使用的工具',
+  'setting.ai.mcp-exposed-tools-placeholder':
+    '留空即开放全部常用工具；填 * 开放所有工具（含危险工具）；也可只指定其中几个，多个用英文逗号分隔',
+  'setting.ai.mcp-exposed-tools-extra':
+    '备份、升级、删除等危险工具默认不开放，需要在此手动加入。也可填写分类名（如 content、seo）授权一整类工具',
+  'setting.ai.mcp-available-tools':
+    '本站点可用工具（{count}）：点击下面的工具名即可加入上方列表，悬停查看说明',
+  'setting.ai.mcp-risk-level': '风险等级：',
+  'setting.ai.mcp-default-off': '（默认不开放，需手动加入）',
+  'setting.ai.mcp-invoke-admin': '接口调用身份',
+  'setting.ai.mcp-invoke-admin-none': '不开放',
+  'setting.ai.mcp-invoke-admin-required': '请选择接口调用身份',
+  'setting.ai.mcp-invoke-admin-extra':
+    '选择 AI 调用网站接口时以哪个管理员身份进行，首次进入已默认选中第一位管理员。选「不开放」时 AI 无法调用任何后台接口',
+  'setting.ai.mcp-exposure-mode': '接口开放范围',
+  'setting.ai.mcp-exposure-mode-attention':
+    '请先选择接口开放范围，否则 AI 无法访问网站数据',
+  'setting.ai.mcp-exposure-mode-required': '请选择接口开放范围',
+  'setting.ai.mcp-exposure-mode-off': '关闭（AI 不能访问数据）',
+  'setting.ai.mcp-exposure-mode-read': '只读',
+  'setting.ai.mcp-exposure-mode-read-write': '读 + 写（默认，推荐）',
+  'setting.ai.mcp-exposure-mode-all': '全部（含删除，谨慎开启）',
+  'setting.ai.mcp-exposure-mode-extra':
+    '决定 AI 能对网站做哪类操作：只读只能查看，读+写可以新增和修改，全部则包含删除。开启前请确认已选好调用身份',
+  'setting.ai.mcp-exposure-allow-ns': '接口白名单',
+  'setting.ai.mcp-exposure-allow-ns-placeholder':
+    '选填，多个用英文逗号分隔，如 archive, category',
+  'setting.ai.mcp-exposure-allow-ns-extra':
+    '只允许 AI 访问这些模块的接口，留空表示不限制',
+  'setting.ai.mcp-exposure-deny-ns': '接口黑名单',
+  'setting.ai.mcp-exposure-deny-ns-extra':
+    '禁止 AI 访问这些模块的接口，黑名单优先于白名单',
+  'setting.ai.mcp-exposure-deny-endpoints': '禁止访问的接口',
+  'setting.ai.mcp-exposure-deny-endpoints-placeholder':
+    '选填，多个用英文逗号分隔，如 POST /archive/detail',
+  'setting.ai.mcp-exposure-deny-endpoints-extra':
+    '精确禁止 AI 访问某几个具体接口',
+  'setting.ai.endpoint-name': '接口名称',
+  'setting.ai.endpoint-name-example': '例如：我的 DeepSeek',
+  'setting.ai.endpoint-name-required': '请填写接口名称',
+  'setting.ai.api-url': 'API 地址',
+  'setting.ai.api-url-required': '请填写 API 地址',
+  'setting.ai.api-key-required': '请填写 API Key',
+  'setting.ai.model': '模型',
+  'setting.ai.model-required': '请填写模型名称',
+  'setting.ai.thinking-mode': '思考模式',
+  'setting.ai.thinking-on': '开启',
+  'setting.ai.thinking-off': '关闭',
+  'setting.ai.max-tokens': '最大回复长度',
+  'setting.ai.timeout-seconds': '请求超时时间',
 };

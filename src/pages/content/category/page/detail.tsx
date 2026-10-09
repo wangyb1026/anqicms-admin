@@ -2,17 +2,21 @@ import NewContainer from '@/components/NewContainer';
 import AiGenerate from '@/components/aiGenerate';
 import AiGetTdk from '@/components/aitdk';
 import AttachmentSelect from '@/components/attachment';
-import MarkdownEditor from '@/components/markdown';
-import NewAiEditor from '@/components/newAiEditor';
 import {
   anqiExtractDescription,
+  getCategories,
   getCategoryInfo,
   getDesignTemplateFiles,
   getModules,
   getSettingContent,
   saveCategory,
 } from '@/services';
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import {
+  DeleteOutlined,
+  LeftOutlined,
+  PlusOutlined,
+  RightOutlined,
+} from '@ant-design/icons';
 import {
   ProForm,
   ProFormDigit,
@@ -23,15 +27,28 @@ import {
   ProFormTextArea,
 } from '@ant-design/pro-components';
 import { FormattedMessage, history, useIntl } from '@umijs/max';
-import { Button, Card, Col, Image, Modal, Row, Space, message } from 'antd';
-import React, { useEffect, useRef, useState } from 'react';
+import {
+  Button,
+  Card,
+  Col,
+  Image,
+  message,
+  Modal,
+  Row,
+  Space,
+  Tag,
+} from 'antd';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import '../index.less';
+const MarkdownEditor = lazy(() => import('@/components/markdown'));
+const NewAiEditor = lazy(() => import('@/components/newAiEditor'));
+const SimpleEditor = lazy(() => import('@/components/simpleEditor'));
 
 const categoryType = 3;
 
 const PageCategoryDetail: React.FC = () => {
   const formRef = useRef<ProFormInstance>();
-  const editorRef = useRef(null);
+  const editorRef = useRef<any>(null);
   const [content, setContent] = useState<string>('');
   const [categoryImages, setCategoryImages] = useState<string[]>([]);
   const [categoryLogo, setCategoryLogo] = useState<string>('');
@@ -44,6 +61,8 @@ const PageCategoryDetail: React.FC = () => {
   const [aiTitle, setAiTitle] = useState<string>('');
   const [aiVisible, setAiVisible] = useState<boolean>(false);
   const [aiTdkVisible, setAiTdkVisible] = useState<boolean>(false);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [dragImageIndex, setDragImageIndex] = useState<number>(-1);
   const intl = useIntl();
 
   const changeModule = (e: any) => {
@@ -91,6 +110,9 @@ const PageCategoryDetail: React.FC = () => {
       setContentSetting(res.data || {});
       setLoaded(true);
     });
+    getCategories({ type: 3 }).then((res) => {
+      setCategories(res.data || []);
+    });
   };
 
   const onTabChange = (key: string) => {
@@ -124,33 +146,80 @@ const PageCategoryDetail: React.FC = () => {
   };
 
   const handleSelectImages = (rows: any) => {
+    const images = [...categoryImages];
     for (const row of rows) {
       let exists = false;
-
-      for (let i in categoryImages) {
-        if (categoryImages[i] === row.logo) {
+      for (let i in images) {
+        if (images[i] === row.file_path) {
           exists = true;
           break;
         }
       }
       if (!exists) {
-        categoryImages.push(row.logo);
+        images.push(row.file_path);
       }
     }
-    setCategoryImages([].concat(categoryImages));
+    setCategoryImages(images);
     message.success(
       intl.formatMessage({ id: 'setting.system.upload-success' }),
     );
   };
 
+  const handleDragStart = (index: number) => {
+    setDragImageIndex(index);
+  };
+
+  const handleDragOver = (e: any, index: number) => {
+    e.preventDefault();
+    if (dragImageIndex === -1 || dragImageIndex === index) {
+      return;
+    }
+    const images = [...categoryImages];
+    const [moved] = images.splice(dragImageIndex, 1);
+    images.splice(index, 0, moved);
+    setDragImageIndex(index);
+    setCategoryImages(images);
+  };
+
+  const handleDragEnd = () => {
+    setDragImageIndex(-1);
+  };
+
+  const handleDrop = (e: any) => {
+    e.preventDefault();
+    handleDragEnd();
+  };
+
+  const handleMoveImages = (index: number, direction: string, e: any) => {
+    e.stopPropagation();
+    const images = [...categoryImages];
+    if (direction === 'up') {
+      if (index <= 0) {
+        return;
+      }
+      const temp = images[index];
+      images[index] = images[index - 1];
+      images[index - 1] = temp;
+    } else {
+      if (index >= images.length - 1) {
+        return;
+      }
+      const temp = images[index];
+      images[index] = images[index + 1];
+      images[index + 1] = temp;
+    }
+    setCategoryImages(images);
+  };
+
   const handleCleanImages = (index: number, e: any) => {
     e.stopPropagation();
-    categoryImages.splice(index, 1);
-    setCategoryImages([].concat(categoryImages));
+    const images = [...categoryImages];
+    images.splice(index, 1);
+    setCategoryImages(images);
   };
 
   const handleSelectLogo = (row: any) => {
-    setCategoryLogo(row.logo);
+    setCategoryLogo(row.file_path);
     message.success(
       intl.formatMessage({ id: 'setting.system.upload-success' }),
     );
@@ -265,6 +334,55 @@ const PageCategoryDetail: React.FC = () => {
           >
             <Row gutter={20}>
               <Col sm={18} xs={24}>
+                <ProFormSelect
+                  label={intl.formatMessage({ id: 'content.page.parent' })}
+                  name="parent_id"
+                  width="lg"
+                  options={[
+                    {
+                      id: 0,
+                      title: intl.formatMessage({
+                        id: 'content.page.top',
+                      }),
+                      status: 1,
+                    },
+                  ]
+                    .concat(
+                      categories.filter((item) =>
+                        category.id > 0
+                          ? item.id !== category.id &&
+                            item.parent_id !== category.id
+                          : true,
+                      ),
+                    )
+                    .map((cat: any) => ({
+                      title: cat.title,
+                      label: (
+                        <div title={cat.title}>
+                          {cat.parents?.length > 0 ? (
+                            <span className="text-muted">
+                              {cat.parents
+                                .map((parent: any) => parent.title)
+                                .join(' > ')}
+                              {' > '}
+                            </span>
+                          ) : (
+                            ''
+                          )}
+                          {cat.title}
+                        </div>
+                      ),
+                      value: cat.id,
+                      disabled: cat.status !== 1,
+                    }))}
+                  fieldProps={{
+                    showSearch: true,
+                    filterOption: (input: string, option: any) =>
+                      (option?.title ?? option?.label)
+                        .toLowerCase()
+                        .includes(input.toLowerCase()),
+                  }}
+                />
                 <ProFormText
                   name="title"
                   label={intl.formatMessage({ id: 'content.page.name' })}
@@ -328,9 +446,18 @@ const PageCategoryDetail: React.FC = () => {
                   extra={intl.formatMessage({ id: 'content.page.status.tips' })}
                 />
                 {loaded && (
-                  <>
+                  <Suspense fallback={<div style={{ height: 500 }} />}>
                     {contentSetting.editor === 'markdown' ? (
                       <MarkdownEditor
+                        className="mb-normal"
+                        setContent={async (html: string) => {
+                          setContent(html);
+                        }}
+                        content={content}
+                        ref={editorRef}
+                      />
+                    ) : contentSetting.editor === 'simple' ? (
+                      <SimpleEditor
                         className="mb-normal"
                         setContent={async (html: string) => {
                           setContent(html);
@@ -350,7 +477,7 @@ const PageCategoryDetail: React.FC = () => {
                         content={content}
                       />
                     )}
-                  </>
+                  </Suspense>
                 )}
               </Col>
               <Col sm={6} xs={24}>
@@ -406,19 +533,44 @@ const PageCategoryDetail: React.FC = () => {
                 >
                   {categoryImages.length
                     ? categoryImages.map((item: string, index: number) => (
-                        <div className="ant-upload-item" key={index}>
+                        <div
+                          className={
+                            'ant-upload-item' +
+                            (dragImageIndex === index ? ' drag-over' : '')
+                          }
+                          key={index}
+                          draggable
+                          onDragStart={() => handleDragStart(index)}
+                          onDragOver={(e) => handleDragOver(e, index)}
+                          onDragEnd={() => handleDragEnd}
+                          onDrop={(e) => handleDrop(e)}
+                        >
                           <Image
                             preview={{
                               src: item,
                             }}
                             src={item}
                           />
-                          <span
-                            className="delete"
-                            onClick={handleCleanImages.bind(this, index)}
-                          >
-                            <DeleteOutlined />
-                          </span>
+                          <div className="ant-upload-item-action">
+                            <Tag
+                              onClick={(e) => handleMoveImages(index, 'up', e)}
+                            >
+                              <LeftOutlined />
+                            </Tag>
+                            <Tag
+                              color="red"
+                              onClick={(e) => handleCleanImages(index, e)}
+                            >
+                              <DeleteOutlined />
+                            </Tag>
+                            <Tag
+                              onClick={(e) =>
+                                handleMoveImages(index, 'down', e)
+                              }
+                            >
+                              <RightOutlined />
+                            </Tag>
+                          </div>
                         </div>
                       ))
                     : null}

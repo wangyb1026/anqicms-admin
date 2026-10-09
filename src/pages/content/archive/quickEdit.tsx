@@ -16,8 +16,8 @@ import {
   saveArchive,
 } from '@/services';
 import { setStore } from '@/utils/store';
-import { history, useIntl } from '@umijs/max';
-import { Col, Modal, Row, message } from 'antd';
+import { FormattedMessage, useIntl } from '@umijs/max';
+import { Col, Row, message } from 'antd';
 import dayjs from 'dayjs';
 
 export type QuickEditFormProps = {
@@ -32,6 +32,7 @@ const QuickEditForm: React.FC<QuickEditFormProps> = (props) => {
   const [contentSetting, setContentSetting] = useState<any>({});
   const [archive, setArchive] = useState<any>({});
   const [fetched, setFetched] = useState<boolean>(false);
+  const [categories, setCategories] = useState<any[]>([]);
   const intl = useIntl();
 
   const getArchive = async (id: number) => {
@@ -42,6 +43,9 @@ const QuickEditForm: React.FC<QuickEditFormProps> = (props) => {
     data.flag = data.flag?.split(',') || [];
     data.created_moment = dayjs(data.created_time * 1000);
     data.tags = data.tags?.map((tag: any) => tag.title);
+    data.category_ids = data.category_ids.filter(
+      (catid: number) => catid !== data.category_id,
+    );
     setArchive(data);
     setFetched(true);
   };
@@ -50,6 +54,9 @@ const QuickEditForm: React.FC<QuickEditFormProps> = (props) => {
     getArchive(props.archive.id);
     getSettingContent().then((res) => {
       setContentSetting(res.data || {});
+    });
+    getCategories().then((res) => {
+      setCategories(res.data || []);
     });
   }, []);
 
@@ -60,23 +67,21 @@ const QuickEditForm: React.FC<QuickEditFormProps> = (props) => {
       return;
     }
     let categoryIds = [];
-    let categoryId = 0;
-    if (typeof values.category_ids === 'number') {
-      // 单分类
-      categoryId = Number(values.category_ids);
-    } else {
-      for (let i in values.category_ids) {
-        if (values.category_ids[i] > 0) {
-          categoryIds.push(values.category_ids[i]);
-        }
-      }
-      if (categoryIds.length > 0) {
-        categoryId = categoryIds[0];
-      }
-    }
+    let categoryId = values.category_id;
     if (categoryId === 0) {
       message.error(intl.formatMessage({ id: 'content.category.required' }));
       return;
+    }
+    categoryIds.push(categoryId);
+    if (values.category_ids) {
+      for (let i in values.category_ids) {
+        if (
+          values.category_ids[i] > 0 &&
+          values.category_ids[i] !== categoryId
+        ) {
+          categoryIds.push(values.category_ids[i]);
+        }
+      }
     }
     postData.category_id = categoryId;
     postData.category_ids = categoryIds;
@@ -172,37 +177,74 @@ const QuickEditForm: React.FC<QuickEditFormProps> = (props) => {
             <ProFormSelect
               label={intl.formatMessage({ id: 'content.category.name' })}
               showSearch
-              name="category_ids"
-              mode={contentSetting.multi_category === 1 ? 'multiple' : 'single'}
-              request={async () => {
-                const res = await getCategories({ type: 1 });
-                const categories = res.data || [];
-                if (categories.length === 0) {
-                  Modal.error({
-                    title: intl.formatMessage({ id: 'content.category.error' }),
-                    onOk: () => {
-                      history.push('/archive/category');
-                    },
-                  });
-                }
-                return categories;
-              }}
+              name="category_id"
+              options={categories.map((cat: any) => ({
+                title: cat.title,
+                label: (
+                  <div title={cat.title}>
+                    {cat.parents?.length > 0 ? (
+                      <span className="text-muted">
+                        {cat.parents
+                          ?.map((parent: any) => parent.title)
+                          .join(' > ')}
+                        {' > '}
+                      </span>
+                    ) : (
+                      ''
+                    )}
+                    {cat.title}
+                  </div>
+                ),
+                value: cat.id,
+                disabled: cat.status !== 1,
+              }))}
               fieldProps={{
-                fieldNames: {
-                  label: 'title',
-                  value: 'id',
-                },
-                optionItemRender(item: any) {
-                  return (
-                    <div
-                      dangerouslySetInnerHTML={{
-                        __html: item.spacer + item.title,
-                      }}
-                    ></div>
-                  );
-                },
+                showSearch: true,
+                filterOption: (input: string, option: any) =>
+                  (option?.title ?? option?.label)
+                    .toLowerCase()
+                    .includes(input.toLowerCase()),
               }}
             />
+            {contentSetting.multi_category === 1 && (
+              <ProFormSelect
+                name="category_ids"
+                mode="multiple"
+                label={intl.formatMessage({ id: 'content.archive.related-category' })}
+                options={categories.map((cat: any) => ({
+                  title: cat.title,
+                  label: (
+                    <div title={cat.title}>
+                      {cat.parents?.length > 0 ? (
+                        <span className="text-muted">
+                          {cat.parents
+                            ?.map((parent: any) => parent.title)
+                            .join(' > ')}
+                          {' > '}
+                        </span>
+                      ) : (
+                        ''
+                      )}
+                      {cat.title}
+                    </div>
+                  ),
+                  value: cat.id,
+                  disabled: cat.status !== 1,
+                }))}
+                fieldProps={{
+                  showSearch: true,
+                  filterOption: (input: string, option: any) =>
+                    (option?.title ?? option?.label)
+                      .toLowerCase()
+                      .includes(input.toLowerCase()),
+                }}
+                extra={
+                  <div>
+                    <FormattedMessage id="content.archive.related-category.description" />
+                  </div>
+                }
+              />
+            )}
             <ProFormSelect
               label={intl.formatMessage({ id: 'content.tag.name' })}
               mode="tags"

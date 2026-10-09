@@ -24,6 +24,7 @@ import icon_interference from '@/images/icon_interference.png';
 import icon_jsonld from '@/images/icon_jsonld.png';
 import icon_keyword from '@/images/icon_keyword.png';
 import icon_limiter from '@/images/icon_limiter.png';
+import icon_llms from '@/images/icon_llms.png';
 import icon_material from '@/images/icon_material.png';
 import icon_multilang from '@/images/icon_multilang.png';
 import icon_order from '@/images/icon_order.png';
@@ -66,9 +67,18 @@ const PluginIndex: React.FC = () => {
     for (let i in routes) {
       if (routes[i].path === '/plugin') {
         // 需要处理
-        for (let j in routes[i].routes) {
-          if (permissions.indexOf(routes[i].routes[j].path) === -1) {
-            routes[i].routes[j].unaccessible = true;
+        if (!routes[i].routes) {
+          continue;
+        }
+        for (let j = 0; j < routes[i].routes.length; j++) {
+          let item = routes[i].routes[j] as any;
+          if (!item.routes) {
+            continue;
+          }
+          for (let k in item.routes) {
+            if (permissions.indexOf(item.routes[k].path) === -1) {
+              item.routes[k].unaccessible = true;
+            }
           }
         }
       }
@@ -157,6 +167,10 @@ const PluginIndex: React.FC = () => {
         return icon_akismet;
       case 'google':
         return icon_google;
+      case 'llms':
+        return icon_llms;
+      default:
+        return icon_backup;
     }
   };
 
@@ -173,70 +187,77 @@ const PluginIndex: React.FC = () => {
             >
               <FormattedMessage id="plugin.type.all" />
             </div>
-            <div
-              className={'module-tag ' + (type === 'normal' ? 'active' : '')}
-              onClick={() => {
-                onChangeType('normal');
-              }}
-            >
-              <FormattedMessage id="plugin.type.normal" />
-            </div>
-            <div
-              className={'module-tag ' + (type === 'content' ? 'active' : '')}
-              onClick={() => {
-                onChangeType('content');
-              }}
-            >
-              <FormattedMessage id="plugin.type.archive" />
-            </div>
-            <div
-              className={'module-tag ' + (type === 'shop' ? 'active' : '')}
-              onClick={() => {
-                onChangeType('shop');
-              }}
-            >
-              <FormattedMessage id="plugin.type.user-mall" />
-            </div>
-            <div
-              className={'module-tag ' + (type === 'system' ? 'active' : '')}
-              onClick={() => {
-                onChangeType('system');
-              }}
-            >
-              <FormattedMessage id="plugin.type.system" />
-            </div>
+            {routes.map((item: any) => {
+              if (item.path === '/plugin') {
+                return item.routes.map((inner: any) => {
+                  if (!inner.hideInMenu && inner.name && !inner.unaccessible) {
+                    return (
+                      <div
+                        key={inner.name}
+                        className={
+                          'module-tag ' + (type === inner.name ? 'active' : '')
+                        }
+                        onClick={() => {
+                          onChangeType(inner.name);
+                        }}
+                      >
+                        <FormattedMessage id={'menu.plugin.' + inner.name} />
+                      </div>
+                    );
+                  } else {
+                    return null;
+                  }
+                });
+              } else {
+                return null;
+              }
+            })}
           </div>
         }
       >
         <Row gutter={[20, 20]}>
           {routes.map((item: any) => {
             if (item.path === '/plugin') {
-              return item.routes.map((inner: any, i: number) => {
+              return item.routes.map((inner: any) => {
                 if (
                   !inner.hideInMenu &&
                   inner.name &&
                   !inner.unaccessible &&
                   (!type || type === inner.type)
                 ) {
-                  return (
-                    <Col key={i} sm={6} xs={12}>
-                      <div
-                        className="plugin-item"
-                        onClick={() => {
-                          jumpToPlugin(inner);
-                        }}
-                      >
-                        <img className="avatar" src={getIcon(inner.icon)} />
-                        <div className="info">
-                          <div className="title">
-                            <FormattedMessage
-                              id={'menu.plugin.' + inner.name}
+                  return inner.routes.map((inner2: any, i: number) => {
+                    if (inner2.name && !inner2.unaccessible) {
+                      return (
+                        <Col key={i} sm={6} xs={12}>
+                          <div
+                            className="plugin-item"
+                            onClick={() => {
+                              jumpToPlugin(inner2);
+                            }}
+                          >
+                            <img
+                              className="avatar"
+                              src={getIcon(inner2.icon)}
                             />
+                            <div className="info">
+                              <div className="title">
+                                <FormattedMessage
+                                  id={
+                                    'menu.plugin.' +
+                                    inner.name +
+                                    '.' +
+                                    inner2.name
+                                  }
+                                />
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </Col>
-                  );
+                        </Col>
+                      );
+                    } else {
+                      return null;
+                    }
+                  });
                 } else {
                   return null;
                 }

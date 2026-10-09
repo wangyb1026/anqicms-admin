@@ -1,4 +1,5 @@
 import config from '@/services/config';
+import { getIntl } from '@umijs/max';
 import { message } from 'antd';
 import SparkMD5 from 'spark-md5';
 import { getSessionStore, getStore } from './store';
@@ -9,6 +10,16 @@ import { getSessionStore, getStore } from './store';
  */
 export const checkLogin = (permits: any): boolean => !!permits;
 
+export const acceptedExtensions =
+  '.jpg,.jpeg,.png,.gif,.webp,.svg,.bmp,.tiff,.avif,.heic,.heif,.raw,' +
+  '.webm,.mp4,.mp3,.mov,.avi,.wmv,.mkv,.flv,.f4v,.m4v,.m4a,.wav,.flac,.aac,.ogg,' +
+  '.zip,.rar,.7z,.gz,.bz2,.xz,.zst,.tar,.tgz,' +
+  '.pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx,.txt,.csv,.tsv,.odt,.ods,.odp,.rtf,' +
+  '.json,.xml,.yaml,.yml,.toml,.ini,.cfg,.conf,.env,.sql,.log,' +
+  '.md,.markdown,.rst,.tex,' +
+  '.js,.jsx,.ts,.tsx,.vue,.go,.py,.java,.c,.cpp,.h,.hpp,.rs,.rb,.sh,.bat,.ps1,.swift,.kt,.scala,.dart,.lua,.css,.scss,.less,.styl,' +
+  '.psd,.ai,.eps,.sketch,.fig,' +
+  '.ttf,.otf,.woff,.woff2,.eot';
 export const queryParams = (params: any) => {
   let _result = [];
   for (let key in params) {
@@ -160,7 +171,7 @@ export const downloadFile = async (
   newName?: string,
 ) => {
   let hide = message.loading({
-    content: '准备下载',
+    content: getIntl().formatMessage({ id: 'utils.download.preparing' }),
     key: 'loading',
     duration: 0,
   });
@@ -214,7 +225,10 @@ export const downloadFile = async (
     const contentType = response.headers.get('Content-Type');
     if (contentType && contentType.includes('application/json')) {
       const data = await response.json();
-      throw new Error(data.msg || '下载失败');
+      throw new Error(
+        data.msg ||
+          getIntl().formatMessage({ id: 'utils.download.failed' }),
+      );
     }
 
     const contentLength = response.headers.get('Content-Length');
@@ -223,7 +237,9 @@ export const downloadFile = async (
     const chunks: Uint8Array[] = [];
 
     if (!reader) {
-      throw new Error('无法读取响应数据');
+      throw new Error(
+        getIntl().formatMessage({ id: 'utils.download.read-error' }),
+      );
     }
 
     let receivedLength = 0;
@@ -237,7 +253,10 @@ export const downloadFile = async (
       if (total > 0) {
         progress = (receivedLength / total) * 100;
         hide = message.loading({
-          content: `正在下载中 ${Math.round(progress)}%`,
+          content: getIntl().formatMessage(
+            { id: 'utils.download.progress' },
+            { percent: Math.round(progress) },
+          ),
           key: 'loading',
           duration: 0,
         });
@@ -254,10 +273,15 @@ export const downloadFile = async (
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
 
-    message.success('下载完成');
+    message.success(
+      getIntl().formatMessage({ id: 'utils.download.complete' }),
+    );
   } catch (error: any) {
     console.error('Download error:', error);
-    message.error(error.message || '文件下载失败');
+    message.error(
+      error.message ||
+        getIntl().formatMessage({ id: 'utils.download.file-failed' }),
+    );
   } finally {
     hide();
   }

@@ -46,6 +46,8 @@ const ModuleForm: React.FC<ModuleFormProps> = (props) => {
       const res = await getModuleInfo({ id: props.module.id });
       let setting = res.data || { fields: [] };
       setSetting(setting);
+    } else {
+      setSetting({ status: 1 });
     }
     setFetched(true);
   };
@@ -324,25 +326,6 @@ const ModuleForm: React.FC<ModuleFormProps> = (props) => {
                     <FormattedMessage id="content.module.url-token.tips.before" />{' '}
                     <Tag>{'{module}'}</Tag>
                     <FormattedMessage id="content.module.url-token.tips.after" />
-                  </div>
-                </Col>
-              </Row>
-              <Row className="mt-normal" gutter={16}>
-                <Col>
-                  <div style={{ lineHeight: '32px', width: '120px' }}>
-                    <FormattedMessage id="content.module.title-name" />:
-                  </div>
-                </Col>
-                <Col flex={1}>
-                  <Input
-                    name="title_name"
-                    defaultValue={setting.title_name}
-                    onChange={(e: any) => {
-                      handleChangeInput('title_name', e);
-                    }}
-                  />
-                  <div className="text-muted">
-                    <FormattedMessage id="content.module.title-name.description" />
                   </div>
                 </Col>
               </Row>
